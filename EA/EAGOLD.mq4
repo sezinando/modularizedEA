@@ -6,7 +6,7 @@
 // GENERAL / IDENTITY
 //==================================================================
 input string INPUT_GROUP_GENERAL="=== GENERAL / IDENTITY ===";
-extern int MagicNumber=3001;
+extern int MagicNumber=3009;
 
 //==================================================================
 // CORE MONEY / LOT PROGRESSION
