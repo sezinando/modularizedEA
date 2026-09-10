@@ -1,6 +1,6 @@
 #property strict
-#property version "0.100"
-#property description "EAGOLD Modular — migration baseline; R10 pair reduction isolated"
+#property version "0.101"
+#property description "EAGOLD Modular — migration baseline; boot diagnostics enabled"
 
 input int    MagicNumber=3001;
 input double Lot=0.01;
@@ -18,14 +18,15 @@ input int    R10PairCooldownSeconds=30;
 #include "../Core/EAGOLD_Execution.mqh"
 #include "../Core/EAGOLD_Events.mqh"
 #include "../Core/EAGOLD_Telemetry.mqh"
+#include "../Core/EAGOLD_BootDiagnostics.mqh"
 #include "../Persistence/EAGOLD_GlobalState.mqh"
 #include "../UI/EAGOLD_Clock.mqh"
 #include "../UI/EAGOLD_Panel.mqh"
 #include "../Engines/R10/R10_Core.mqh"
 
-EAGOLD_Context    g_ctx;
+EAGOLD_Context     g_ctx;
 EAGOLD_BasketState g_state;
-datetime          g_r10LastAction=0;
+datetime           g_r10LastAction=0;
 
 int OnInit()
 {
@@ -34,7 +35,10 @@ int OnInit()
                       R10PairCooldownSeconds,EnableR10,EnableR10PairReduction);
    g_r10LastAction=EAGOLD_LoadR10LastAction(Symbol(),MagicNumber);
    EAGOLD_MeasureBasket(g_ctx,g_state);
+
+   EAGOLD_BootDiagnostic(g_ctx);
    EAGOLD_PanelUpdate(g_state);
+
    Print("EAGOLD MODULAR: initialized. Trading action is ",
          (EnableR10?"ENABLED":"DISABLED"),". Baseline migration stage: R10.");
    return(INIT_SUCCEEDED);
