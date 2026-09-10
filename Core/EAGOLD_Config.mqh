@@ -7,6 +7,12 @@
 // Keep business behavior out of this file.
 //==================================================================
 
+#define EAGOLD_VERSION "0.106"
+
+double g_panelMinProfit=0.0;
+double g_panelMaxLots=0.0;
+bool g_panelInitialized=false;
+
 input string INPUT_GROUP_GENERAL="=== GENERAL / IDENTITY ===";
 extern int MagicNumber=3009;
 
