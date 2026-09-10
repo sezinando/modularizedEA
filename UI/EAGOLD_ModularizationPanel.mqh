@@ -32,8 +32,8 @@ void EAGOLD_ModPanelUpdate()
    EAGOLD_ModPanelLabel("TITLE","EAGOLD MODULARIZATION",0,clrWhite);
    EAGOLD_ModPanelLabel("SEP","========================",1,clrSilver);
    EAGOLD_ModPanelLabel("S1","[DONE] 01 CORE / ORDERS",2,clrLime);
-   EAGOLD_ModPanelLabel("S2","[DONE] 02 CORE / EXECUTION",3,clrYellow);
-   EAGOLD_ModPanelLabel("S3","[NEXT] 03 PERSISTENCE",4,clrSilver);
+   EAGOLD_ModPanelLabel("S2","[DONE] 02 CORE / EXECUTION",3,clrLime);
+   EAGOLD_ModPanelLabel("S3","[NEXT] 03 PERSISTENCE",4,clrYellow);
    EAGOLD_ModPanelLabel("S4","[----] 04 R9 EXPOSURE",5,clrSilver);
    EAGOLD_ModPanelLabel("S5","[----] 05 R10 INTEGRATION",6,clrSilver);
    EAGOLD_ModPanelLabel("S6","[----] 06 RECOVERY",7,clrSilver);
