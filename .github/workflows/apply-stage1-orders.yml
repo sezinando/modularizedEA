@@ -34,19 +34,23 @@ jobs:
               '// Stage 1: order ownership, counting and exposure measurement.', ''
           ]
           for name in funcs:
-              m = re.search(r'^(?:bool|void|double|int|string|datetime)\\s+'+name+r'\\s*\\([^\\n]*\\)\\{[^\\n]*\\}', src, re.M)
+              m = re.search(r'^(?:bool|void|double|int|string|datetime)\s+'+name+r'\s*\([^\n]*\)\{[^\n]*\}', src, re.M)
               if not m:
                   raise SystemExit(f'missing function: {name}')
               out += [m.group(0), '']
           out += ['#endif', '']
-          Path('Core/EAGOLD_Orders.mqh').write_text('\\n'.join(out), encoding='utf-8')
+          Path('Core/EAGOLD_Orders.mqh').write_text('\n'.join(out), encoding='utf-8')
 
           for name in funcs:
-              m = re.search(r'^(?:bool|void|double|int|string|datetime)\\s+'+name+r'\\s*\\([^\\n]*\\)\\{[^\\n]*\\}\\n?', src, re.M)
+              m = re.search(r'^(?:bool|void|double|int|string|datetime)\s+'+name+r'\s*\([^\n]*\)\{[^\n]*\}\n?', src, re.M)
+              if not m:
+                  raise SystemExit(f'missing removal target: {name}')
               src = src[:m.start()] + src[m.end():]
 
-          marker = 'double g_r10RecoveryWorstEquity=0.0;\\n'
-          src = src.replace(marker, marker+'\\n#include "../Core/EAGOLD_Orders.mqh"\\n#include "../UI/EAGOLD_ModularizationPanel.mqh"\\n', 1)
+          marker = 'double g_r10RecoveryWorstEquity=0.0;\n'
+          if marker not in src:
+              raise SystemExit('EA insertion marker not found')
+          src = src.replace(marker, marker+'\n#include "../Core/EAGOLD_Orders.mqh"\n#include "../UI/EAGOLD_ModularizationPanel.mqh"\n', 1)
           src = src.replace('UpdateExposureTelemetry();PanelUpdate();PersistAllState();return(INIT_SUCCEEDED);', 'UpdateExposureTelemetry();PanelUpdate();EAGOLD_ModPanelUpdate();PersistAllState();return(INIT_SUCCEEDED);', 1)
           src = src.replace('PanelDelete();}', 'PanelDelete();EAGOLD_ModPanelDelete();}', 1)
           src = src.replace('UpdateExposureTelemetry();PanelUpdate();PersistAllState();}', 'UpdateExposureTelemetry();PanelUpdate();EAGOLD_ModPanelUpdate();PersistAllState();}', 1)
