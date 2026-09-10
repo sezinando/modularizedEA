@@ -52,6 +52,15 @@ extern bool EnableGlobalStopTrail=true;
 extern double GlobalStopTrailCooldownSeconds=0.0;
 extern double GlobalStopTrailMinStepPoints=0.0;
 
+input string INPUT_GROUP_BRX="=== BRX BASKET REALIZATION ENGINE ===";
+extern bool EnableBasketRealization=true;
+// 0=LEGACY COUNT*TP | 1=DIRECTIONAL | 2=BIDIRECTIONAL | 3=HYBRID
+extern int BRXRealizationMode=3;
+extern double BRXDirectionalMinProfit=5.00;
+extern double BRXBidirectionalMinProfit=5.00;
+extern bool BRXRequireWeightedBE=false;
+extern double BRXWeightedBEBufferPoints=0.0;
+
 input string INPUT_GROUP_R9="=== R9 EXPOSURE CONTROLLER ===";
 extern bool EnableR9Hedge=true;
 extern double R9ExposureTriggerLots=1.00;
