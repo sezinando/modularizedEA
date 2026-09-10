@@ -136,7 +136,7 @@ void EAGOLD_ModPanelUpdate()
    double recoveryRemaining=R10RecoveryRemainingDebt();
 
    int row=0;
-   EAGOLD_ModPanelBackground(true,EnableModularizationDebug?430:310);
+   EAGOLD_ModPanelBackground(true,EnableModularizationDebug?535:385);
 
    EAGOLD_ModPanelLabel("TITLE","EAGOLD  |  OPERATIONAL MONITOR",row++,clrWhite);
    EAGOLD_ModPanelLabel("SEP1","------------------------------------------",row++,clrDimGray);
