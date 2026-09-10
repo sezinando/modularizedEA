@@ -1,7 +1,7 @@
 #ifndef EAGOLD_ORDERS_MQH
 #define EAGOLD_ORDERS_MQH
 
-// Extracted from EAGOLD v0.106 without behavioral changes.
+// Extracted from authoritative EAGOLD v0.106 without behavioral changes.
 // Stage 1: order ownership, counting and exposure measurement.
 
 bool IsEAGOLDOrder(){return(OrderSymbol()==Symbol()&&OrderMagicNumber()==MagicNumber);}
