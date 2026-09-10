@@ -1,60 +1,27 @@
 #ifndef EAGOLD_ORDERS_MQH
 #define EAGOLD_ORDERS_MQH
 
-void EAGOLD_MeasureBasket(const EAGOLD_Context &ctx,EAGOLD_BasketState &s)
-{
-   EAGOLD_BasketReset(s);
-   for(int i=OrdersTotal()-1;i>=0;i--)
-   {
-      if(!OrderSelect(i,SELECT_BY_POS,MODE_TRADES)) continue;
-      if(!EAGOLD_IsOwnedOrder(ctx)) continue;
-      int type=OrderType();
-      if(type==OP_BUY)
-      {
-         s.buyLots+=OrderLots();
-         s.buyProfit+=OrderProfit()+OrderSwap()+OrderCommission();
-      }
-      else if(type==OP_SELL)
-      {
-         s.sellLots+=OrderLots();
-         s.sellProfit+=OrderProfit()+OrderSwap()+OrderCommission();
-      }
-   }
-   s.netSigned=s.buyLots-s.sellLots;
-   s.exposure=MathAbs(s.netSigned);
-   s.gross=s.buyLots+s.sellLots;
-   s.balance=AccountBalance();
-   s.equity=AccountEquity();
-   s.margin=AccountMargin();
-   s.freeMargin=AccountFreeMargin();
-   s.marginLevel=(s.margin>0.0 ? (s.equity/s.margin)*100.0 : 0.0);
-}
+// Extracted from EAGOLD v0.106 without behavioral changes.
+// Stage 1: order ownership, counting and exposure measurement.
 
-int EAGOLD_CountDirection(const EAGOLD_Context &ctx,int type)
-{
-   int count=0;
-   for(int i=OrdersTotal()-1;i>=0;i--)
-   {
-      if(!OrderSelect(i,SELECT_BY_POS,MODE_TRADES)) continue;
-      if(!EAGOLD_IsOwnedOrder(ctx)) continue;
-      if(OrderType()==type) count++;
-   }
-   return count;
-}
+bool IsEAGOLDOrder(){return(OrderSymbol()==Symbol()&&OrderMagicNumber()==MagicNumber);}
 
-bool EAGOLD_FindLargestTicket(const EAGOLD_Context &ctx,int type,int &ticket,double &lots)
-{
-   ticket=-1; lots=0.0;
-   for(int i=OrdersTotal()-1;i>=0;i--)
-   {
-      if(!OrderSelect(i,SELECT_BY_POS,MODE_TRADES)) continue;
-      if(!EAGOLD_IsOwnedOrder(ctx) || OrderType()!=type) continue;
-      if(OrderLots()>lots || (MathAbs(OrderLots()-lots)<0.0000001 && OrderTicket()<ticket))
-      {
-         ticket=OrderTicket(); lots=OrderLots();
-      }
-   }
-   return(ticket>0 && lots>0.0);
-}
+int CountOrdersByType(int type){int count=0;for(int i=OrdersTotal()-1;i>=0;i--){if(!OrderSelect(i,SELECT_BY_POS,MODE_TRADES))continue;if(!IsEAGOLDOrder())continue;if(OrderType()==type)count++;}return(count);}
+
+int CountDirectionPositions(int direction){return(CountOrdersByType(direction==OP_BUY?OP_BUY:OP_SELL));}
+
+int CountDirectionPending(int direction){return(CountOrdersByType(direction==OP_BUY?OP_BUYSTOP:OP_SELLSTOP));}
+
+int CountEAGOLDOrders(){int count=0;for(int i=OrdersTotal()-1;i>=0;i--){if(!OrderSelect(i,SELECT_BY_POS,MODE_TRADES))continue;if(IsEAGOLDOrder())count++;}return(count);}
+
+double DirectionBasketProfit(int direction){int type=(direction==OP_BUY?OP_BUY:OP_SELL);double total=0.0;for(int i=OrdersTotal()-1;i>=0;i--){if(!OrderSelect(i,SELECT_BY_POS,MODE_TRADES))continue;if(!IsEAGOLDOrder()||OrderType()!=type)continue;total+=OrderProfit()+OrderSwap()+OrderCommission();}return(total);}
+
+double DirectionLots(int direction){int type=(direction==OP_BUY?OP_BUY:OP_SELL);double total=0.0;for(int i=OrdersTotal()-1;i>=0;i--){if(!OrderSelect(i,SELECT_BY_POS,MODE_TRADES))continue;if(!IsEAGOLDOrder()||OrderType()!=type)continue;total+=OrderLots();}return(total);}
+
+double ExposureLots(){return(MathAbs(DirectionLots(OP_BUY)-DirectionLots(OP_SELL)));}
+
+int HeavyDirection(){double b=DirectionLots(OP_BUY),s=DirectionLots(OP_SELL);if(b>s)return(OP_BUY);if(s>b)return(OP_SELL);return(-1);}
+
+double EAGOLDAccumulatedProfit(){double total=0.0;for(int i=OrdersHistoryTotal()-1;i>=0;i--){if(!OrderSelect(i,SELECT_BY_POS,MODE_HISTORY))continue;if(!IsEAGOLDOrder())continue;int type=OrderType();if(type==OP_BUY||type==OP_SELL)total+=OrderProfit()+OrderSwap()+OrderCommission();}return(total);}
 
 #endif
