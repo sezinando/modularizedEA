@@ -1,12 +1,27 @@
 #ifndef EAGOLD_ORDERS_MQH
 #define EAGOLD_ORDERS_MQH
 
-// Extracted from authoritative EAGOLD v0.106 without behavioral changes.
+// Extracted from authoritative EAGOLD v0.106.
 // Stage 1: order ownership, counting and exposure measurement.
 // MagicNumber == -1 is the explicit ALL SYMBOL ORDERS ownership mode.
+// R13 owns a reserved Magic namespace and is never part of the Master universe.
+// Ownership boundary is Symbol + Magic; comment is observational only.
+
+bool IsR13Order(){
+   if(OrderSymbol()!=Symbol())return(false);
+   return(OrderMagicNumber()==R13MagicNumber);
+}
+
+bool IsR13OwnershipConfigurationValid(){
+   if(R13MagicNumber<0)return(false);
+   if(MagicNumber!=-1 && R13MagicNumber==MagicNumber)return(false);
+   return(true);
+}
 
 bool IsEAGOLDOrder(){
    if(OrderSymbol()!=Symbol())return(false);
+   // R13 uses a reserved Magic and is never part of the Master universe.
+   if(OrderMagicNumber()==R13MagicNumber)return(false);
    if(MagicNumber==-1)return(true);
    return(OrderMagicNumber()==MagicNumber);
 }
