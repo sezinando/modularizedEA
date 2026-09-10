@@ -1,0 +1,137 @@
+name: Apply Stage 2 Execution Modularization
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-stage2-execution.yml'
+  workflow_dispatch:
+
+jobs:
+  modularize:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract execution layer and update EA
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          ea_path = Path('EA/EAGOLD.mq4')
+          mod_path = Path('Core/EAGOLD_Execution.mqh')
+          panel_path = Path('UI/EAGOLD_ModularizationPanel.mqh')
+
+          text = ea_path.read_text(encoding='utf-8')
+          names = [
+              'SendPending',
+              'SendMarket',
+              'CloseMarketOrder',
+              'CloseMarketOrderLots',
+              'DeletePendingOrder',
+              'CloseAllDirectionPending',
+          ]
+
+          def extract_function(src, name):
+              m = re.search(r'(?m)^(?:bool|int|double|void)\\s+' + re.escape(name) + r'\\s*\\(', src)
+              if not m:
+                  raise RuntimeError(f'Function not found: {name}')
+              brace = src.find('{', m.end())
+              if brace < 0:
+                  raise RuntimeError(f'Opening brace not found: {name}')
+              depth = 0
+              in_string = False
+              escape = False
+              in_line_comment = False
+              in_block_comment = False
+              i = brace
+              while i < len(src):
+                  c = src[i]
+                  n = src[i+1] if i+1 < len(src) else ''
+                  if in_line_comment:
+                      if c == '\\n':
+                          in_line_comment = False
+                  elif in_block_comment:
+                      if c == '*' and n == '/':
+                          in_block_comment = False
+                          i += 1
+                  elif in_string:
+                      if escape:
+                          escape = False
+                      elif c == '\\\\':
+                          escape = True
+                      elif c == '"':
+                          in_string = False
+                  else:
+                      if c == '/' and n == '/':
+                          in_line_comment = True
+                          i += 1
+                      elif c == '/' and n == '*':
+                          in_block_comment = True
+                          i += 1
+                      elif c == '"':
+                          in_string = True
+                      elif c == '{':
+                          depth += 1
+                      elif c == '}':
+                          depth -= 1
+                          if depth == 0:
+                              return m.start(), i + 1, src[m.start():i+1]
+                  i += 1
+              raise RuntimeError(f'Unbalanced braces in: {name}')
+
+          found = []
+          for name in names:
+              start, end, body = extract_function(text, name)
+              found.append((start, end, name, body))
+
+          found.sort(reverse=True)
+          for start, end, name, body in found:
+              text = text[:start] + text[end:]
+
+          include = '#include "../Core/EAGOLD_Execution.mqh"'
+          if include not in text:
+              marker = '#include "../UI/EAGOLD_ModularizationPanel.mqh"'
+              if marker not in text:
+                  raise RuntimeError('Expected UI include marker not found')
+              text = text.replace(marker, include + '\n' + marker, 1)
+
+          module_bodies = [body for _, _, _, body in sorted(found, key=lambda x: names.index(x[2]))]
+          module = '''#ifndef EAGOLD_EXECUTION_MQH\n#define EAGOLD_EXECUTION_MQH\n\n// Stage 2: Core execution layer extracted from the proven EAGOLD v0.106 baseline.\n// Behavioral logic is intentionally preserved; orchestration remains in EA/EAGOLD.mq4.\n\n''' + '\n\n'.join(module_bodies) + '\n\n#endif\n'
+          mod_path.parent.mkdir(parents=True, exist_ok=True)
+          mod_path.write_text(module, encoding='utf-8')
+          ea_path.write_text(text, encoding='utf-8')
+
+          panel = panel_path.read_text(encoding='utf-8')
+          replacements = {
+              '[NEXT] 02 CORE / EXECUTION': '[DONE] 02 CORE / EXECUTION',
+              '[----] 03 PERSISTENCE': '[NEXT] 03 PERSISTENCE',
+              'PROGRESS: 1 / 8  (12.5%)': 'PROGRESS: 2 / 8  (25.0%)',
+          }
+          for old, new in replacements.items():
+              if old not in panel:
+                  raise RuntimeError(f'Panel marker not found: {old}')
+              panel = panel.replace(old, new, 1)
+          panel_path.write_text(panel, encoding='utf-8')
+
+          # Basic structural assertions before commit.
+          for name in names:
+              if re.search(r'(?m)^(?:bool|int|double|void)\\s+' + re.escape(name) + r'\\s*\\(', text):
+                  raise RuntimeError(f'Execution function still present in EA: {name}')
+          for name in names:
+              if not re.search(r'(?m)^(?:bool|int|double|void)\\s+' + re.escape(name) + r'\\s*\\(', module):
+                  raise RuntimeError(f'Execution function missing from module: {name}')
+          print('Stage 2 extraction successful.')
+
+      - name: Commit Stage 2
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add EA/EAGOLD.mq4 Core/EAGOLD_Execution.mqh UI/EAGOLD_ModularizationPanel.mqh
+          git diff --cached --quiet && { echo 'No changes to commit'; exit 0; }
+          git commit -m 'refactor: modularize stage 2 execution layer'
+          git push
