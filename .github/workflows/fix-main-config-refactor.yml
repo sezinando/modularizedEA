@@ -1,0 +1,56 @@
+name: Fix Main Config Refactor
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-main-config-refactor.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Restore main and externalize configuration
+        shell: bash
+        run: |
+          git show edab8bc8a21c35287e8151590192197afe5b2033:EA/EAGOLD.mq4 > /tmp/EAGOLD_base.mq4
+          python3 - <<'PY'
+          from pathlib import Path
+          base = Path('/tmp/EAGOLD_base.mq4').read_text(encoding='utf-8')
+          marker_start = '//==================================================================\n// GENERAL / IDENTITY\n//==================================================================\n'
+          marker_end = 'string EA_NAME="EAGOLD";'
+          start = base.find(marker_start)
+          end = base.find(marker_end)
+          if start < 0 or end < 0 or end <= start:
+              raise SystemExit('Could not locate configuration block')
+          replacement = '#include "../Core/EAGOLD_Config.mqh"\n\n'
+          restored = base[:start] + replacement + base[end:]
+          if 'int OnInit()' not in restored or 'void OnTick()' not in restored:
+              raise SystemExit('Execution functions missing after restore')
+          if 'extern int MagicNumber=3009;' in restored:
+              raise SystemExit('Configuration was not fully externalized')
+          if '#include "../Core/EAGOLD_Config.mqh"' not in restored:
+              raise SystemExit('Config include missing')
+          Path('EA/EAGOLD.mq4').write_text(restored, encoding='utf-8')
+          print('Main restored from known-good Stage 8 baseline and config externalized.')
+          PY
+          grep -q '#include "../Core/EAGOLD_Config.mqh"' EA/EAGOLD.mq4
+          grep -q 'int OnInit()' EA/EAGOLD.mq4
+          grep -q 'void OnTick()' EA/EAGOLD.mq4
+          git diff --check
+
+      - name: Commit repair
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add EA/EAGOLD.mq4
+          git diff --cached --check
+          git commit -m "refactor: move EAGOLD configuration out of main"
+          git push
