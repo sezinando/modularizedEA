@@ -47,6 +47,11 @@ extern int MaxTrades=2000;
 extern bool EnableCloseBy=true;
 extern double BuyProgressionTolerance=10.0;
 
+input string INPUT_GROUP_GLOBAL_TRAIL="=== GLOBAL STOP TRAIL CONTROL ===";
+extern bool EnableGlobalStopTrail=true;
+extern double GlobalStopTrailCooldownSeconds=0.0;
+extern double GlobalStopTrailMinStepPoints=0.0;
+
 input string INPUT_GROUP_R9="=== R9 EXPOSURE CONTROLLER ===";
 extern bool EnableR9Hedge=true;
 extern double R9ExposureTriggerLots=1.00;
