@@ -8,6 +8,7 @@
 //==================================================================
 
 #define EAGOLD_VERSION "0.106"
+#define EAGOLD_R13_DEFAULT_COMMENT "EAGOLD_RECOVERY_SATELLITE"
 
 double g_panelMinProfit=0.0;
 double g_panelMaxLots=0.0;
@@ -67,6 +68,29 @@ extern double BRXDirectionalMinProfit=5.00;
 extern double BRXBidirectionalMinProfit=5.00;
 extern bool BRXRequireWeightedBE=false;
 extern double BRXWeightedBEBufferPoints=0.0;
+
+input string INPUT_GROUP_R13="=== R13 RECOVERY SATELLITE ===";
+// R13 is intentionally OFF by default. Configuration only: no execution is
+// authorized by this contract stage.
+extern bool EnableR13=false;
+extern bool EnableR13AutoActivation=false;
+// Must be distinct from the Master universe when R13 execution is enabled.
+extern int R13MagicNumber=3010;
+extern string R13OrderComment=EAGOLD_R13_DEFAULT_COMMENT;
+extern double R13MaxLots=0.20;
+extern int R13MaxPositions=3;
+extern double R13MaxDrawdown=50.00;
+extern double R13MaxDailyLoss=50.00;
+extern double R13MaxSpread=100.0;
+extern int R13StartHour=0;
+extern int R13EndHour=23;
+// Directional complementarity: in PROFIT mode, R13's dominant direction
+// must be opposite to the Master dominant direction when Master is unbalanced.
+extern bool EnableR13DirectionalComplementarity=true;
+extern double R13MinDirectionalImbalance=0.01;
+// Fraction of realized R13 net P/L that may eventually become Recovery Capital.
+// Zero keeps capital transfer disabled during the initial implementation stages.
+extern double R13RecoveryCapitalFraction=0.0;
 
 input string INPUT_GROUP_PANEL="=== MODULAR PANEL / DEBUG ===";
 extern bool EnableModularizationPanel=true;
