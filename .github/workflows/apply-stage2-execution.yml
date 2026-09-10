@@ -36,7 +36,7 @@ jobs:
           ]
 
           def extract_function(src, name):
-              pattern = r'(?m)^(?:bool|int|double|void) +' + re.escape(name) + r' *\\('
+              pattern = r'(?m)^(?:bool|int|double|void) +' + re.escape(name)
               m = re.search(pattern, src)
               if not m:
                   raise RuntimeError(f'Function not found: {name}')
@@ -118,9 +118,10 @@ jobs:
           panel_path.write_text(panel, encoding='utf-8')
 
           for name in names:
-              if re.search(r'(?m)^(?:bool|int|double|void) +' + re.escape(name) + r' *\\(', text):
+              signature = r'(?m)^(?:bool|int|double|void) +' + re.escape(name)
+              if re.search(signature, text):
                   raise RuntimeError(f'Execution function still present in EA: {name}')
-              if not re.search(r'(?m)^(?:bool|int|double|void) +' + re.escape(name) + r' *\\(', module):
+              if not re.search(signature, module):
                   raise RuntimeError(f'Execution function missing from module: {name}')
           print('Stage 2 extraction successful.')
 
