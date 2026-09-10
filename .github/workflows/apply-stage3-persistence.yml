@@ -63,14 +63,14 @@ jobs:
               a,b,body=extract_function(text,name); found.append((a,b,name,body))
           for a,b,name,body in sorted(found,reverse=True): text=text[:a]+text[b:]
 
-          include='#include "../Core/EAGOLD_Persistence.mqh"'
-          marker='#include "../Core/EAGOLD_Execution.mqh"'
+          include='#include "../Core/EAGOLD_Persistence.mqh"'; marker='#include "../Core/EAGOLD_Execution.mqh"'
           if include not in text:
               if marker not in text: raise RuntimeError('Expected execution include marker not found')
               text=text.replace(marker,marker+'\n'+include,1)
 
           bodies=[body for _,_,_,body in sorted(found,key=lambda x:names.index(x[2]))]
-          module='''#ifndef EAGOLD_PERSISTENCE_MQH\n#define EAGOLD_PERSISTENCE_MQH\n\n// Stage 3: Persistence layer extracted from the proven EAGOLD v0.106 baseline.\n// Behavioral logic is intentionally preserved; runtime orchestration remains in EA/EAGOLD.mq4.\n\n''+'\n\n'.join(bodies)+'\n\n#endif\n'
+          header=['#ifndef EAGOLD_PERSISTENCE_MQH','#define EAGOLD_PERSISTENCE_MQH','', '// Stage 3: Persistence layer extracted from the proven EAGOLD v0.106 baseline.','// Behavioral logic is intentionally preserved; runtime orchestration remains in EA/EAGOLD.mq4','']
+          module='\n'.join(header+bodies+['','#endif',''])
           mod_path.write_text(module,encoding='utf-8'); ea_path.write_text(text,encoding='utf-8')
 
           panel=panel_path.read_text(encoding='utf-8')
