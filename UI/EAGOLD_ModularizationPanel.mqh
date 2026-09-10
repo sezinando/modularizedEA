@@ -32,14 +32,14 @@ void EAGOLD_ModPanelUpdate()
    EAGOLD_ModPanelLabel("TITLE","EAGOLD MODULARIZATION",0,clrWhite);
    EAGOLD_ModPanelLabel("SEP","========================",1,clrSilver);
    EAGOLD_ModPanelLabel("S1","[DONE] 01 CORE / ORDERS",2,clrLime);
-   EAGOLD_ModPanelLabel("S2","[NEXT] 02 CORE / EXECUTION",3,clrYellow);
-   EAGOLD_ModPanelLabel("S3","[----] 03 PERSISTENCE",4,clrSilver);
+   EAGOLD_ModPanelLabel("S2","[DONE] 02 CORE / EXECUTION",3,clrYellow);
+   EAGOLD_ModPanelLabel("S3","[NEXT] 03 PERSISTENCE",4,clrSilver);
    EAGOLD_ModPanelLabel("S4","[----] 04 R9 EXPOSURE",5,clrSilver);
    EAGOLD_ModPanelLabel("S5","[----] 05 R10 INTEGRATION",6,clrSilver);
    EAGOLD_ModPanelLabel("S6","[----] 06 RECOVERY",7,clrSilver);
    EAGOLD_ModPanelLabel("S7","[----] 07 LIFECYCLE",8,clrSilver);
    EAGOLD_ModPanelLabel("S8","[----] 08 R1 ADMISSION",9,clrSilver);
-   EAGOLD_ModPanelLabel("PROG","PROGRESS: 1 / 8  (12.5%)",10,clrAqua);
+   EAGOLD_ModPanelLabel("PROG","PROGRESS: 2 / 8  (25.0%)",10,clrAqua);
    EAGOLD_ModPanelLabel("STATUS","STATUS: MODULE LOADED / RUNNING",11,clrLime);
    EAGOLD_ModPanelLabel("ORDERS","ORDERS: "+IntegerToString(CountEAGOLDOrders()),12,clrAqua);
    EAGOLD_ModPanelLabel("HEART","HEARTBEAT: "+TimeToString(TimeCurrent(),TIME_SECONDS),13,clrWhite);
