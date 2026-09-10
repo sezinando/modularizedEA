@@ -35,11 +35,11 @@ void EAGOLD_ModPanelUpdate()
    EAGOLD_ModPanelLabel("S2","[DONE] 02 CORE / EXECUTION",3,clrLime);
    EAGOLD_ModPanelLabel("S3","[DONE] 03 PERSISTENCE",4,clrLime);
    EAGOLD_ModPanelLabel("S4","[DONE] 04 R9 EXPOSURE",5,clrLime);
-   EAGOLD_ModPanelLabel("S5","[NEXT] 05 R10 INTEGRATION",6,clrYellow);
-   EAGOLD_ModPanelLabel("S6","[----] 06 RECOVERY",7,clrSilver);
+   EAGOLD_ModPanelLabel("S5","[DONE] 05 R10 INTEGRATION",6,clrLime);
+   EAGOLD_ModPanelLabel("S6","[NEXT] 06 RECOVERY",7,clrYellow);
    EAGOLD_ModPanelLabel("S7","[----] 07 LIFECYCLE",8,clrSilver);
    EAGOLD_ModPanelLabel("S8","[----] 08 R1 ADMISSION",9,clrSilver);
-   EAGOLD_ModPanelLabel("PROG","PROGRESS: 4 / 8  (50.0%)",10,clrAqua);
+   EAGOLD_ModPanelLabel("PROG","PROGRESS: 5 / 8  (62.5%)",10,clrAqua);
    EAGOLD_ModPanelLabel("STATUS","STATUS: MODULE LOADED / RUNNING",11,clrLime);
    EAGOLD_ModPanelLabel("ORDERS","ORDERS: "+IntegerToString(CountEAGOLDOrders()),12,clrAqua);
    EAGOLD_ModPanelLabel("HEART","HEARTBEAT: "+TimeToString(TimeCurrent(),TIME_SECONDS),13,clrWhite);
