@@ -1,0 +1,152 @@
+name: Apply Stage 7 Lifecycle
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-stage7-lifecycle.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  modularize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract lifecycle layer
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          ea = Path('EA/EAGOLD.mq4')
+          mod = Path('Engines/EAGOLD_Lifecycle.mqh')
+          panel = Path('UI/EAGOLD_ModularizationPanel.mqh')
+          text = ea.read_text(encoding='utf-8')
+
+          names = [
+              'EnsureDirectionMachineAlive',
+              'CreateFirstOrdersIfFlat',
+              'CanCloseLightBasket',
+              'CloseDirectionPositionsRobust',
+              'BuySingleTakeProfit',
+              'SellSingleTakeProfit',
+              'BuyBasketTargetReached',
+              'SellBasketTargetReached',
+              'BuyBasketClose',
+              'SellBasketClose',
+              'TrailAllStopOrders',
+              'RestartEmptyBasket',
+              'BuyMachine',
+              'SellMachine'
+          ]
+
+          def locate(src, name):
+              lines = src.splitlines(True)
+              offset = 0
+              for line in lines:
+                  stripped = line.lstrip()
+                  if any(
+                      stripped.startswith(t + ' ' + name + '(') or
+                      stripped.startswith(t + ' ' + name + ' (')
+                      for t in ['bool', 'void', 'double', 'int']
+                  ):
+                      start = offset
+                      brace = src.find('{', start)
+                      if brace < 0:
+                          raise SystemExit('Opening brace missing: ' + name)
+                      depth = 0
+                      i = brace
+                      quote = None
+                      while i < len(src):
+                          ch = src[i]
+                          if quote:
+                              if ch == '\\':
+                                  i += 2
+                                  continue
+                              if ch == quote:
+                                  quote = None
+                          else:
+                              if ch in ['"', "'"]:
+                                  quote = ch
+                              elif ch == '{':
+                                  depth += 1
+                              elif ch == '}':
+                                  depth -= 1
+                                  if depth == 0:
+                                      return start, i + 1
+                          i += 1
+                      raise SystemExit('Unclosed definition: ' + name)
+                  offset += len(line)
+              raise SystemExit('Missing lifecycle definition: ' + name)
+
+          extracted = {}
+          ranges = []
+          for name in names:
+              s, e = locate(text, name)
+              extracted[name] = text[s:e]
+              ranges.append((s, e))
+
+          new_text = text
+          for s, e in sorted(ranges, reverse=True):
+              ls = new_text.rfind('\n', 0, s) + 1
+              le = new_text.find('\n', e)
+              if le < 0:
+                  le = len(new_text)
+              else:
+                  le += 1
+              new_text = new_text[:ls] + new_text[le:]
+
+          inc = '#include "../Engines/EAGOLD_Lifecycle.mqh"\n'
+          anchor = '#include "../Engines/EAGOLD_Recovery.mqh"\n'
+          if inc not in new_text:
+              p = new_text.find(anchor)
+              if p < 0:
+                  raise SystemExit('Recovery include anchor not found')
+              new_text = new_text[:p + len(anchor)] + inc + new_text[p + len(anchor):]
+
+          out = [
+              '#ifndef EAGOLD_LIFECYCLE_MQH',
+              '#define EAGOLD_LIFECYCLE_MQH',
+              '',
+              '//==================================================================',
+              '// STAGE 7 — LIFECYCLE / R4 / R5 / R7',
+              '// Business behavior extracted from EAGOLD v0.106 without redesign.',
+              '//==================================================================',
+              ''
+          ]
+          for name in names:
+              out += [extracted[name], '']
+          out.append('#endif')
+          mod.parent.mkdir(parents=True, exist_ok=True)
+          mod.write_text('\n'.join(out) + '\n', encoding='utf-8')
+
+          ptext = panel.read_text(encoding='utf-8')
+          ptext = ptext.replace('[NEXT] 07 LIFECYCLE",8,clrYellow', '[DONE] 07 LIFECYCLE",8,clrLime')
+          ptext = ptext.replace('[----] 08 R1 ADMISSION",9,clrSilver', '[NEXT] 08 R1 ADMISSION",9,clrYellow')
+          ptext = ptext.replace('PROGRESS: 6 / 8  (75.0%)', 'PROGRESS: 7 / 8  (87.5%)')
+
+          module_text = mod.read_text(encoding='utf-8')
+          for name in names:
+              if name + '(' not in module_text:
+                  raise SystemExit('Missing in module: ' + name)
+          if inc not in new_text:
+              raise SystemExit('Lifecycle include missing')
+
+          ea.write_text(new_text, encoding='utf-8')
+          panel.write_text(ptext, encoding='utf-8')
+          print('Stage 7 Lifecycle extraction validated.')
+          PY
+
+      - name: Commit stage 7
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add EA/EAGOLD.mq4 Engines/EAGOLD_Lifecycle.mqh UI/EAGOLD_ModularizationPanel.mqh
+          git diff --cached --check
+          git commit -m "refactor: modularize stage 7 lifecycle layer"
+          git push
