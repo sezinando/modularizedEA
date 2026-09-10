@@ -192,7 +192,10 @@ void EAGOLD_ModPanelUpdate()
 
    EAGOLD_ModPanelLabel("TITLE",StringFormat("EAGOLD v%s | OPERATIONAL PANEL",EAGOLD_VERSION),row++,clrWhite);
    EAGOLD_ModPanelLabel("SEP1","----------------------------------------------",row++,clrDimGray);
-   EAGOLD_ModPanelLabel("IDENT",StringFormat("SYMBOL %-8s  MAGIC %d",Symbol(),MagicNumber),row++,clrAqua);
+   if(MagicNumber==-1)
+      EAGOLD_ModPanelLabel("IDENT",StringFormat("SYMBOL %-8s  MAGIC -1  | TODOS",Symbol()),row++,clrYellow);
+   else
+      EAGOLD_ModPanelLabel("IDENT",StringFormat("SYMBOL %-8s  MAGIC %d",Symbol(),MagicNumber),row++,clrAqua);
    EAGOLD_ModPanelLabel("MARKET",StringFormat("BID %10s  ASK %10s",DoubleToString(Bid,Digits),DoubleToString(Ask,Digits)),row++,clrWhite);
    color spreadColor=spreadAlert?clrTomato:clrLime;
    EAGOLD_ModPanelLabel("SPREAD",StringFormat("SPREAD %6.1f pts / LIMIT %d",spreadPoints,SpreadLimit),row++,spreadColor);
