@@ -218,7 +218,7 @@ void EAGOLD_ModPanelUpdate()
    EAGOLD_ModPanelLabel("SEP4","----------------------------------------------",row++,clrDimGray);
    EAGOLD_ModPanelLabel("BE",StringFormat("AVG BUY  %10s   AVG SELL %10s",buyBE>0.0?DoubleToString(buyBE,Digits):"-",sellBE>0.0?DoubleToString(sellBE,Digits):"-"),row++,clrSilver);
    EAGOLD_ModPanelLabel("NEXT",StringFormat("NEXT BUY %10s   TAKE BUY %10s",buyNext>0.0?DoubleToString(buyNext,Digits):"-",buyTake>0.0?DoubleToString(buyTake,Digits):"-"),row++,clrSilver);
-   EAGOLD_ModPanelLabel("NEXTS",StringFormat("NEXT SELL%10s   TAKE SELL%10s",sellNext>0.0?DoubleToString(sellNext,Digits):"-",sellTake>0.0?DoubleToString(sellTake,Digits):"-"),row++,clrSilver);
+   EAGOLD_ModPanelLabel("NEXTS",StringFormat("NEXT SELL %10s   TAKE SELL %10s",sellNext>0.0?DoubleToString(sellNext,Digits):"-",sellTake>0.0?DoubleToString(sellTake,Digits):"-"),row++,clrSilver);
    EAGOLD_ModPanelLabel("HEDGE",StringFormat("HEDGE     %s",g_r9HedgeActive?"ATIVO":"INATIVO"),row++,g_r9HedgeActive?clrYellow:clrSilver);
    EAGOLD_ModPanelLabel("R11",StringFormat("R11 STEP x %4.2f   L%-2d = %s",EnableRecoveryStepMultiplier?RecoveryStepMultiplier:1.00,displayLevel,EAGOLD_ModPanelLots(RecoveryStepForLevel(displayLevel))),row++,EnableRecoveryStepMultiplier?clrAqua:clrSilver);
    EAGOLD_ModPanelLabel("REC",StringFormat("RECOVERY  B%-2d S%-2d L%-2d",RecoveryLevel(OP_BUY),RecoveryLevel(OP_SELL),recoveryLevel),row++,recoveryRemaining>0.0?clrYellow:clrLime);
