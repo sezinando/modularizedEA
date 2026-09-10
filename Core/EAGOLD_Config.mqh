@@ -61,6 +61,10 @@ extern double BRXBidirectionalMinProfit=5.00;
 extern bool BRXRequireWeightedBE=false;
 extern double BRXWeightedBEBufferPoints=0.0;
 
+input string INPUT_GROUP_PANEL="=== MODULAR PANEL / DEBUG ===";
+extern bool EnableModularizationPanel=true;
+extern bool EnableModularizationDebug=false;
+
 input string INPUT_GROUP_R9="=== R9 EXPOSURE CONTROLLER ===";
 extern bool EnableR9Hedge=true;
 extern double R9ExposureTriggerLots=1.00;
