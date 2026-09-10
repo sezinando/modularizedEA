@@ -19,41 +19,37 @@ jobs:
         shell: python
         run: |
           from pathlib import Path
+          ea_path=Path('EA/EAGOLD.mq4'); mod_path=Path('Core/EAGOLD_Persistence.mqh'); panel_path=Path('UI/EAGOLD_ModularizationPanel.mqh')
+          text=ea_path.read_text(encoding='utf-8')
+          names=['StateKey','ConfigKey','PersistConfigState','LoadPersistedConfig','PersistAllState']
 
-          ea_path = Path('EA/EAGOLD.mq4')
-          mod_path = Path('Core/EAGOLD_Persistence.mqh')
-          panel_path = Path('UI/EAGOLD_ModularizationPanel.mqh')
-          text = ea_path.read_text(encoding='utf-8')
-
-          names = ['StateKey','ConfigKey','PersistConfigState','LoadPersistedConfig','PersistAllState']
-
-          def extract_function(src, name):
-              candidates = []
-              for return_type in ('bool','int','double','void','string','datetime'):
-                  needle = return_type + ' ' + name + '('
-                  pos = 0
+          def extract_function(src,name):
+              candidates=[]
+              for rt in ('bool','int','double','void','string','datetime'):
+                  needle=rt+' '+name+'('
+                  pos=0
                   while True:
-                      p = src.find(needle, pos)
-                      if p < 0: break
-                      if p == 0 or src[p-1] in '\n\r': candidates.append(p)
-                      pos = p + 1
-              if not candidates: raise RuntimeError('Function not found: ' + name)
-              start = min(candidates); brace = src.find('{', start)
-              if brace < 0: raise RuntimeError('Opening brace not found: ' + name)
-              depth=0; in_string=False; escape=False; in_line_comment=False; in_block_comment=False; i=brace
-              while i < len(src):
+                      p=src.find(needle,pos)
+                      if p<0: break
+                      if p==0 or src[p-1] in '\n\r': candidates.append(p)
+                      pos=p+1
+              if not candidates: raise RuntimeError('Function not found: '+name)
+              start=min(candidates); brace=src.find('{',start)
+              if brace<0: raise RuntimeError('Opening brace not found: '+name)
+              depth=0; in_string=False; escape=False; line_comment=False; block_comment=False; i=brace
+              while i<len(src):
                   c=src[i]; n=src[i+1] if i+1<len(src) else ''
-                  if in_line_comment:
-                      if c=='\n': in_line_comment=False
-                  elif in_block_comment:
-                      if c=='*' and n=='/': in_block_comment=False; i+=1
+                  if line_comment:
+                      if c=='\n': line_comment=False
+                  elif block_comment:
+                      if c=='*' and n=='/': block_comment=False; i+=1
                   elif in_string:
                       if escape: escape=False
                       elif c=='\\': escape=True
                       elif c=='"': in_string=False
                   else:
-                      if c=='/' and n=='/': in_line_comment=True; i+=1
-                      elif c=='/' and n=='*': in_block_comment=True; i+=1
+                      if c=='/' and n=='/': line_comment=True; i+=1
+                      elif c=='/' and n=='*': block_comment=True; i+=1
                       elif c=='"': in_string=True
                       elif c=='{': depth+=1
                       elif c=='}':
@@ -64,17 +60,17 @@ jobs:
 
           found=[]
           for name in names:
-              start,end,body=extract_function(text,name); found.append((start,end,name,body))
-          for start,end,name,body in sorted(found, reverse=True): text=text[:start]+text[end:]
+              a,b,body=extract_function(text,name); found.append((a,b,name,body))
+          for a,b,name,body in sorted(found,reverse=True): text=text[:a]+text[b:]
 
           include='#include "../Core/EAGOLD_Persistence.mqh"'
+          marker='#include "../Core/EAGOLD_Execution.mqh"'
           if include not in text:
-              marker='#include "../Core/EAGOLD_Execution.mqh"'
               if marker not in text: raise RuntimeError('Expected execution include marker not found')
               text=text.replace(marker,marker+'\n'+include,1)
 
-          module_bodies=[body for _,_,_,body in sorted(found,key=lambda x:names.index(x[2]))]
-          module='''#ifndef EAGOLD_PERSISTENCE_MQH\n#define EAGOLD_PERSISTENCE_MQH\n\n// Stage 3: Persistence layer extracted from the proven EAGOLD v0.106 baseline.\n// Behavioral logic is intentionally preserved; runtime orchestration remains in EA/EAGOLD.mq4.\n\n'''+'\n\n'.join(module_bodies)+'\n\n#endif\n'
+          bodies=[body for _,_,_,body in sorted(found,key=lambda x:names.index(x[2]))]
+          module='''#ifndef EAGOLD_PERSISTENCE_MQH\n#define EAGOLD_PERSISTENCE_MQH\n\n// Stage 3: Persistence layer extracted from the proven EAGOLD v0.106 baseline.\n// Behavioral logic is intentionally preserved; runtime orchestration remains in EA/EAGOLD.mq4.\n\n''+'\n\n'.join(bodies)+'\n\n#endif\n'
           mod_path.write_text(module,encoding='utf-8'); ea_path.write_text(text,encoding='utf-8')
 
           panel=panel_path.read_text(encoding='utf-8')
@@ -84,9 +80,11 @@ jobs:
               panel=panel.replace(old,new,1)
           panel_path.write_text(panel,encoding='utf-8')
 
+          signatures=[rt+' '+name+'(' for rt in ('bool','int','double','void','string','datetime') for name in names]
+          for sig in signatures:
+              if any(line.startswith(sig) for line in text.splitlines()): raise RuntimeError('Persistence definition still present in EA: '+sig)
           for name in names:
-              if name+'(' in text: raise RuntimeError('Persistence function still present in EA: '+name)
-              if name+'(' not in module: raise RuntimeError('Persistence function missing from module: '+name)
+              if not any((rt+' '+name+'(') in module for rt in ('bool','int','double','void','string','datetime')): raise RuntimeError('Persistence function missing from module: '+name)
           print('Stage 3 extraction successful.')
 
       - name: Commit Stage 3
