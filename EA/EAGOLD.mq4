@@ -10,7 +10,6 @@
 #include "../Core/EAGOLD_Orders.mqh"
 #include "../Core/EAGOLD_Execution.mqh"
 #include "../Core/EAGOLD_Persistence.mqh"
-#include "../UI/EAGOLD_ModularizationPanel.mqh"
 
 string EA_NAME="EAGOLD";
 string PANEL_PREFIX="EAGOLD_BT_";
@@ -40,6 +39,7 @@ double NormalizeLot(double lot){if(lot<Lot)lot=Lot;if(MaxOpenLot>0.0&&lot>MaxOpe
 #include "../Engines/EAGOLD_Recovery.mqh"
 #include "../Engines/EAGOLD_Lifecycle.mqh"
 #include "../Engines/EAGOLD_R1_Admission.mqh"
+#include "../UI/EAGOLD_ModularizationPanel.mqh"
 
 //==================================================================
 // TELEMETRY / UI / EXECUTION ORCHESTRATION
