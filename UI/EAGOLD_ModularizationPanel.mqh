@@ -157,7 +157,7 @@ void EAGOLD_ModPanelUpdate()
    int row=0;
    EAGOLD_ModPanelBackground(true,EnableModularizationDebug?620:500);
 
-   EAGOLD_ModPanelLabel("TITLE","EAGOLD  |  OPERATIONAL PANEL",row++,clrWhite);
+   EAGOLD_ModPanelLabel("TITLE",StringFormat("EAGOLD v%s | OPERATIONAL PANEL",EAGOLD_VERSION),row++,clrWhite);
    EAGOLD_ModPanelLabel("SEP1","----------------------------------------------",row++,clrDimGray);
    EAGOLD_ModPanelLabel("IDENT",StringFormat("SYMBOL %-8s  MAGIC %d",Symbol(),MagicNumber),row++,clrAqua);
    EAGOLD_ModPanelLabel("MARKET",StringFormat("BID %10s  ASK %10s",DoubleToString(Bid,Digits),DoubleToString(Ask,Digits)),row++,clrWhite);
@@ -195,7 +195,7 @@ void EAGOLD_ModPanelUpdate()
    {
       EAGOLD_ModPanelLabel("SEP6","============= DEBUG =============",row++,clrDimGray);
       EAGOLD_ModPanelLabel("DBG1","MODULE STATUS: RUNNING",row++,clrLime);
-      EAGOLD_ModPanelLabel("DBG2","S1-S9: COMPLETE  | BASELINE v0.106",row++,clrSilver);
+      EAGOLD_ModPanelLabel("DBG2",StringFormat("S1-S9: COMPLETE  | BASELINE v%s",EAGOLD_VERSION),row++,clrSilver);
       EAGOLD_ModPanelLabel("DBG3","R1 DECISION: "+g_r1LastDecision,row++,clrWhite);
       EAGOLD_ModPanelLabel("DBG4","R1 REASON: "+g_r1LastReason,row++,clrSilver);
       EAGOLD_ModPanelLabel("DBG5","R1 TIME: "+(g_r1LastDecisionTime>0?TimeToString(g_r1LastDecisionTime,TIME_SECONDS):"-"),row++,clrSilver);
