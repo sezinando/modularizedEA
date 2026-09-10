@@ -14,7 +14,8 @@ double g_panelMaxLots=0.0;
 bool g_panelInitialized=false;
 
 input string INPUT_GROUP_GENERAL="=== GENERAL / IDENTITY ===";
-extern int MagicNumber=3009;
+// -1 = TODOS os pedidos/ordens do símbolo, independentemente do Magic.
+extern int MagicNumber=-1;
 
 input string INPUT_GROUP_MONEY="=== CORE MONEY / LOT PROGRESSION ===";
 extern double Lot=0.01;
