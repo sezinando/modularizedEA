@@ -1,0 +1,62 @@
+name: Apply Stage 1 Orders Modularization
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-stage1-orders.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract order layer from authoritative v0.106
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/sezinando/newbot/main/EA/EAGOLD.mq4 -o /tmp/EAGOLD.mq4
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          src = Path('/tmp/EAGOLD.mq4').read_text(encoding='utf-8-sig')
+          funcs = [
+              'IsEAGOLDOrder','CountOrdersByType','CountDirectionPositions',
+              'CountDirectionPending','CountEAGOLDOrders','DirectionBasketProfit',
+              'DirectionLots','ExposureLots','HeavyDirection','EAGOLDAccumulatedProfit'
+          ]
+          out = [
+              '#ifndef EAGOLD_ORDERS_MQH', '#define EAGOLD_ORDERS_MQH', '',
+              '// Extracted from authoritative EAGOLD v0.106 without behavioral changes.',
+              '// Stage 1: order ownership, counting and exposure measurement.', ''
+          ]
+          for name in funcs:
+              m = re.search(r'^(?:bool|void|double|int|string|datetime)\\s+'+name+r'\\s*\\([^\\n]*\\)\\{[^\\n]*\\}', src, re.M)
+              if not m:
+                  raise SystemExit(f'missing function: {name}')
+              out += [m.group(0), '']
+          out += ['#endif', '']
+          Path('Core/EAGOLD_Orders.mqh').write_text('\\n'.join(out), encoding='utf-8')
+
+          for name in funcs:
+              m = re.search(r'^(?:bool|void|double|int|string|datetime)\\s+'+name+r'\\s*\\([^\\n]*\\)\\{[^\\n]*\\}\\n?', src, re.M)
+              src = src[:m.start()] + src[m.end():]
+
+          marker = 'double g_r10RecoveryWorstEquity=0.0;\\n'
+          src = src.replace(marker, marker+'\\n#include "../Core/EAGOLD_Orders.mqh"\\n#include "../UI/EAGOLD_ModularizationPanel.mqh"\\n', 1)
+          src = src.replace('UpdateExposureTelemetry();PanelUpdate();PersistAllState();return(INIT_SUCCEEDED);', 'UpdateExposureTelemetry();PanelUpdate();EAGOLD_ModPanelUpdate();PersistAllState();return(INIT_SUCCEEDED);', 1)
+          src = src.replace('PanelDelete();}', 'PanelDelete();EAGOLD_ModPanelDelete();}', 1)
+          src = src.replace('UpdateExposureTelemetry();PanelUpdate();PersistAllState();}', 'UpdateExposureTelemetry();PanelUpdate();EAGOLD_ModPanelUpdate();PersistAllState();}', 1)
+          Path('EA/EAGOLD.mq4').write_text(src, encoding='utf-8')
+          PY
+
+      - name: Commit Stage 1
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Core/EAGOLD_Orders.mqh EA/EAGOLD.mq4
+          git commit -m 'refactor: modularize stage 1 order layer' || exit 0
+          git push
