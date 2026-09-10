@@ -122,4 +122,9 @@ extern int PanelBottomX2=190;
 extern int PanelBottomX3=520;
 extern int PanelBottomX4=850;
 
+//==================================================================
+// LAYOUT / VISUAL ADJUSTMENTS
+//==================================================================
+extern int PanelBackgroundWidth=430;
+
 #endif
