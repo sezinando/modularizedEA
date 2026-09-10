@@ -1,0 +1,44 @@
+name: Restore EAGOLD v0.106 behavior
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/restore-legacy-eagold.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout modularizedEA
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Restore authoritative legacy EA
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/sezinando/newbot/main/EA/EAGOLD.mq4 -o EA/EAGOLD.mq4
+          test -s EA/EAGOLD.mq4
+          grep -q 'version   "0.106"' EA/EAGOLD.mq4
+          grep -q 'void OnTick()' EA/EAGOLD.mq4
+          grep -q 'CreateFirstOrdersIfFlat();' EA/EAGOLD.mq4
+          grep -q 'Rule9DetectActivatedOrders();' EA/EAGOLD.mq4
+          grep -q 'Rule10Reduce' EA/EAGOLD.mq4
+          grep -q 'R10RecoveryUpdateState();' EA/EAGOLD.mq4
+          grep -q 'TrailAllStopOrders();' EA/EAGOLD.mq4
+
+      - name: Commit restored operational baseline
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add EA/EAGOLD.mq4
+          if git diff --cached --quiet; then
+            echo 'EA already matches authoritative v0.106 baseline.'
+            exit 0
+          fi
+          git commit -m 'restore: recover authoritative EAGOLD v0.106 runtime [skip ci]'
+          git push
