@@ -36,7 +36,8 @@ jobs:
           ]
 
           def extract_function(src, name):
-              m = re.search(r'(?m)^(?:bool|int|double|void)\\s+' + re.escape(name) + r'\\s*\\(', src)
+              pattern = r'(?m)^(?:bool|int|double|void) +' + re.escape(name) + r' *\\('
+              m = re.search(pattern, src)
               if not m:
                   raise RuntimeError(f'Function not found: {name}')
               brace = src.find('{', m.end())
@@ -52,7 +53,7 @@ jobs:
                   c = src[i]
                   n = src[i+1] if i+1 < len(src) else ''
                   if in_line_comment:
-                      if c == '\\n':
+                      if c == '\n':
                           in_line_comment = False
                   elif in_block_comment:
                       if c == '*' and n == '/':
@@ -61,7 +62,7 @@ jobs:
                   elif in_string:
                       if escape:
                           escape = False
-                      elif c == '\\\\':
+                      elif c == '\\':
                           escape = True
                       elif c == '"':
                           in_string = False
@@ -88,8 +89,7 @@ jobs:
               start, end, body = extract_function(text, name)
               found.append((start, end, name, body))
 
-          found.sort(reverse=True)
-          for start, end, name, body in found:
+          for start, end, name, body in sorted(found, reverse=True):
               text = text[:start] + text[end:]
 
           include = '#include "../Core/EAGOLD_Execution.mqh"'
@@ -117,12 +117,10 @@ jobs:
               panel = panel.replace(old, new, 1)
           panel_path.write_text(panel, encoding='utf-8')
 
-          # Basic structural assertions before commit.
           for name in names:
-              if re.search(r'(?m)^(?:bool|int|double|void)\\s+' + re.escape(name) + r'\\s*\\(', text):
+              if re.search(r'(?m)^(?:bool|int|double|void) +' + re.escape(name) + r' *\\(', text):
                   raise RuntimeError(f'Execution function still present in EA: {name}')
-          for name in names:
-              if not re.search(r'(?m)^(?:bool|int|double|void)\\s+' + re.escape(name) + r'\\s*\\(', module):
+              if not re.search(r'(?m)^(?:bool|int|double|void) +' + re.escape(name) + r' *\\(', module):
                   raise RuntimeError(f'Execution function missing from module: {name}')
           print('Stage 2 extraction successful.')
 
