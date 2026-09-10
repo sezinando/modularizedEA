@@ -1,0 +1,131 @@
+name: Apply Stage 3 Persistence Modularization
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-stage3-persistence.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  modularize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract persistence layer and update EA
+        shell: python
+        run: |
+          from pathlib import Path
+
+          ea_path = Path('EA/EAGOLD.mq4')
+          mod_path = Path('Core/EAGOLD_Persistence.mqh')
+          panel_path = Path('UI/EAGOLD_ModularizationPanel.mqh')
+          text = ea_path.read_text(encoding='utf-8')
+
+          names = [
+              'StateKey',
+              'ConfigKey',
+              'PersistConfigState',
+              'LoadPersistedConfig',
+              'PersistAllState',
+          ]
+
+          def extract_function(src, name):
+              candidates = []
+              for return_type in ('bool','int','double','void','string','datetime'):
+                  needle = return_type + ' ' + name + '('
+                  pos = 0
+                  while True:
+                      p = src.find(needle, pos)
+                      if p < 0:
+                          break
+                      if p == 0 or src[p-1] in '\n\r':
+                          candidates.append(p)
+                      pos = p + 1
+              if not candidates:
+                  raise RuntimeError('Function not found: ' + name)
+              start = min(candidates)
+              brace = src.find('{', start)
+              if brace < 0:
+                  raise RuntimeError('Opening brace not found: ' + name)
+              depth = 0
+              in_string = False
+              escape = False
+              in_line_comment = False
+              in_block_comment = False
+              i = brace
+              while i < len(src):
+                  c = src[i]
+                  n = src[i+1] if i+1 < len(src) else ''
+                  if in_line_comment:
+                      if c == '\n': in_line_comment = False
+                  elif in_block_comment:
+                      if c == '*' and n == '/':
+                          in_block_comment = False; i += 1
+                  elif in_string:
+                      if escape: escape = False
+                      elif c == '\\': escape = True
+                      elif c == '"': in_string = False
+                  else:
+                      if c == '/' and n == '/': in_line_comment = True; i += 1
+                      elif c == '/' and n == '*': in_block_comment = True; i += 1
+                      elif c == '"': in_string = True
+                      elif c == '{': depth += 1
+                      elif c == '}':
+                          depth -= 1
+                          if depth == 0:
+                              return start, i + 1, src[start:i+1]
+                  i += 1
+              raise RuntimeError('Unbalanced braces: ' + name)
+
+          found = []
+          for name in names:
+              start, end, body = extract_function(text, name)
+              found.append((start, end, name, body))
+
+          for start, end, name, body in sorted(found, reverse=True):
+              text = text[:start] + text[end:]
+
+          include = '#include "../Core/EAGOLD_Persistence.mqh"'
+          if include not in text:
+              marker = '#include "../Core/EAGOLD_Execution.mqh"'
+              if marker not in text:
+                  raise RuntimeError('Expected execution include marker not found')
+              text = text.replace(marker, marker + '\n' + include, 1)
+
+          module_bodies = [body for _, _, _, body in sorted(found, key=lambda x: names.index(x[2]))]
+          module = '''#ifndef EAGOLD_PERSISTENCE_MQH\n#define EAGOLD_PERSISTENCE_MQH\n\n// Stage 3: Persistence layer extracted from the proven EAGOLD v0.106 baseline.\n// Behavioral logic is intentionally preserved; runtime orchestration remains in EA/EAGOLD.mq4.\n\n''' + '\n\n'.join(module_bodies) + '\n\n#endif\n'
+          mod_path.write_text(module, encoding='utf-8')
+          ea_path.write_text(text, encoding='utf-8')
+
+          panel = panel_path.read_text(encoding='utf-8')
+          replacements = {
+              '[----] 03 PERSISTENCE': '[DONE] 03 PERSISTENCE',
+              '[----] 04 R9 EXPOSURE': '[NEXT] 04 R9 EXPOSURE',
+              'PROGRESS: 2 / 8  (25.0%)': 'PROGRESS: 3 / 8  (37.5%)',
+          }
+          for old, new in replacements.items():
+              if old not in panel:
+                  raise RuntimeError('Panel marker not found: ' + old)
+              panel = panel.replace(old, new, 1)
+          panel_path.write_text(panel, encoding='utf-8')
+
+          for name in names:
+              if (name + '(') in text:
+                  raise RuntimeError('Persistence function still present in EA: ' + name)
+              if (name + '(') not in module:
+                  raise RuntimeError('Persistence function missing from module: ' + name)
+          print('Stage 3 extraction successful.')
+
+      - name: Commit Stage 3
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add EA/EAGOLD.mq4 Core/EAGOLD_Persistence.mqh UI/EAGOLD_ModularizationPanel.mqh
+          git diff --cached --quiet && { echo 'No changes to commit'; exit 0; }
+          git commit -m 'refactor: modularize stage 3 persistence layer'
+          git push
