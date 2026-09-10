@@ -1,0 +1,145 @@
+name: Apply Stage 5 R10
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-stage5-r10.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  modularize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract R10 and update EA
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          ea = Path('EA/EAGOLD.mq4')
+          mod = Path('Engines/EAGOLD_R10.mqh')
+          panel = Path('UI/EAGOLD_ModularizationPanel.mqh')
+          text = ea.read_text(encoding='utf-8')
+
+          names = [
+              'CreateR10VisualMarker',
+              'ReduceDirectionByLots',
+              'R10FindProfitFundedPair',
+              'Rule10ProfitFundedPartial',
+              'Rule10Reduce',
+          ]
+
+          def find_definition(src, name):
+              rx = re.compile(r'(?m)^(?:bool|void|double|int)\\s+' + re.escape(name) + r'\\s*\\(')
+              m = rx.search(src)
+              if not m:
+                  raise SystemExit('Missing R10 definition: ' + name)
+              start = m.start()
+              brace = src.find('{', m.end())
+              if brace < 0:
+                  raise SystemExit('Missing opening brace: ' + name)
+              depth = 0
+              i = brace
+              state = 'code'
+              while i < len(src):
+                  ch = src[i]
+                  nxt = src[i+1] if i+1 < len(src) else ''
+                  if state == 'code':
+                      if ch == '/' and nxt == '/': state = 'line'; i += 2; continue
+                      if ch == '/' and nxt == '*': state = 'block'; i += 2; continue
+                      if ch == '"': state = 'string'; i += 1; continue
+                      if ch == "'": state = 'char'; i += 1; continue
+                      if ch == '{': depth += 1
+                      elif ch == '}':
+                          depth -= 1
+                          if depth == 0: return start, i + 1
+                      i += 1
+                  elif state == 'line':
+                      if ch == '\\n': state = 'code'
+                      i += 1
+                  elif state == 'block':
+                      if ch == '*' and nxt == '/': state = 'code'; i += 2
+                      else: i += 1
+                  elif state == 'string':
+                      if ch == '\\\\': i += 2
+                      elif ch == '"': state = 'code'; i += 1
+                      else: i += 1
+                  else:
+                      if ch == '\\\\': i += 2
+                      elif ch == "'": state = 'code'; i += 1
+                      else: i += 1
+              raise SystemExit('Unclosed definition: ' + name)
+
+          extracted = {}
+          ranges = []
+          for name in names:
+              start, end = find_definition(text, name)
+              extracted[name] = text[start:end]
+              ranges.append((start, end))
+
+          new_text = text
+          for start, end in sorted(ranges, reverse=True):
+              line_start = new_text.rfind('\n', 0, start) + 1
+              line_end = new_text.find('\n', end)
+              if line_end < 0: line_end = len(new_text)
+              else: line_end += 1
+              new_text = new_text[:line_start] + new_text[line_end:]
+
+          include = '#include "../Engines/EAGOLD_R10.mqh"\n'
+          anchor = '#include "../Engines/EAGOLD_R9.mqh"'
+          if include not in new_text:
+              p = new_text.find(anchor)
+              if p < 0: raise SystemExit('R10 include anchor not found')
+              e = new_text.find('\n', p)
+              new_text = new_text[:e+1] + include + new_text[e+1:]
+
+          lines = [
+              '#ifndef EAGOLD_R10_MQH',
+              '#define EAGOLD_R10_MQH',
+              '',
+              '//==================================================================',
+              '// STAGE 5 — R10 EXPOSURE REDUCTION INTEGRATION',
+              '// Business behavior extracted from EAGOLD v0.106 without redesign.',
+              '//==================================================================',
+              ''
+          ]
+          for name in names:
+              lines.extend([extracted[name], ''])
+          lines.append('#endif')
+          mod.parent.mkdir(parents=True, exist_ok=True)
+          mod.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+
+          ptext = panel.read_text(encoding='utf-8')
+          ptext = ptext.replace('[DONE] 04 R9 EXPOSURE",5,clrLime', '[DONE] 04 R9 EXPOSURE",5,clrLime')
+          ptext = ptext.replace('[NEXT] 05 R10 INTEGRATION",6,clrYellow', '[DONE] 05 R10 INTEGRATION",6,clrLime')
+          ptext = ptext.replace('[----] 06 RECOVERY",7,clrSilver', '[NEXT] 06 RECOVERY",7,clrYellow')
+          ptext = ptext.replace('PROGRESS: 4 / 8  (50.0%)', 'PROGRESS: 5 / 8  (62.5%)')
+          panel.write_text(ptext, encoding='utf-8')
+
+          modtext = mod.read_text(encoding='utf-8')
+          for name in names:
+              rx = re.compile(r'(?m)^(?:bool|void|double|int)\\s+' + re.escape(name) + r'\\s*\\(')
+              if not rx.search(modtext): raise SystemExit('Missing in R10 module: ' + name)
+              if rx.search(new_text): raise SystemExit('Duplicate R10 definition remains in EA: ' + name)
+          if include not in new_text: raise SystemExit('R10 include missing from EA')
+
+          ea.write_text(new_text, encoding='utf-8')
+          print('Stage 5 R10 extraction validated.')
+          PY
+
+      - name: Commit stage 5
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add EA/EAGOLD.mq4 Engines/EAGOLD_R10.mqh UI/EAGOLD_ModularizationPanel.mqh
+          git diff --cached --check
+          git commit -m "refactor: modularize stage 5 R10 integration"
+          git push
