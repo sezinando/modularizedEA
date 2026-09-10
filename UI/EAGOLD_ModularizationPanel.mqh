@@ -39,17 +39,18 @@ void EAGOLD_ModPanelUpdate()
    EAGOLD_ModPanelLabel("S6","[DONE] 06 RECOVERY",7,clrLime);
    EAGOLD_ModPanelLabel("S7","[DONE] 07 LIFECYCLE",8,clrLime);
    EAGOLD_ModPanelLabel("S8","[DONE] 08 R1 ADMISSION",9,clrLime);
-   EAGOLD_ModPanelLabel("PROG","PROGRESS: 8 / 8  (100.0%)",10,clrAqua);
-   EAGOLD_ModPanelLabel("STATUS","STATUS: MODULE LOADED / RUNNING",11,clrLime);
-   EAGOLD_ModPanelLabel("ORDERS","ORDERS: "+IntegerToString(CountEAGOLDOrders()),12,clrAqua);
-   EAGOLD_ModPanelLabel("HEART","HEARTBEAT: "+TimeToString(TimeCurrent(),TIME_SECONDS),13,clrWhite);
-   EAGOLD_ModPanelLabel("BASE","BASELINE: v0.106",14,clrSilver);
+   EAGOLD_ModPanelLabel("S9","[DONE] 09 BRX / BASKET REALIZATION",10,clrLime);
+   EAGOLD_ModPanelLabel("PROG","PROGRESS: 9 / 9  (100.0%)",11,clrAqua);
+   EAGOLD_ModPanelLabel("STATUS","STATUS: MODULE LOADED / RUNNING",12,clrLime);
+   EAGOLD_ModPanelLabel("ORDERS","ORDERS: "+IntegerToString(CountEAGOLDOrders()),13,clrAqua);
+   EAGOLD_ModPanelLabel("HEART","HEARTBEAT: "+TimeToString(TimeCurrent(),TIME_SECONDS),14,clrWhite);
+   EAGOLD_ModPanelLabel("BASE","BASELINE: v0.106",15,clrSilver);
    ChartRedraw(0);
 }
 
 void EAGOLD_ModPanelDelete()
 {
-   string ids[]={"TITLE","SEP","S1","S2","S3","S4","S5","S6","S7","S8","PROG","STATUS","ORDERS","HEART","BASE"};
+   string ids[]={"TITLE","SEP","S1","S2","S3","S4","S5","S6","S7","S8","S9","PROG","STATUS","ORDERS","HEART","BASE"};
    for(int i=0;i<ArraySize(ids);i++)
    {
       string name=EAGOLD_MOD_PANEL_PREFIX+ids[i];
