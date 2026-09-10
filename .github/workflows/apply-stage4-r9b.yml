@@ -1,0 +1,83 @@
+name: Apply Stage 4 R9 B
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-stage4-r9b.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  modularize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Extract R9 and update EA
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          ea = Path('EA/EAGOLD.mq4')
+          mod = Path('Engines/EAGOLD_R9.mqh')
+          panel = Path('UI/EAGOLD_ModularizationPanel.mqh')
+          text = ea.read_text(encoding='utf-8')
+          names = ['IntArrayContains','IntArrayAdd','R9Processed','R9MarkProcessed','R9SeedExistingPositions','R9GetNewExposureState','R9HedgeFromActivatedTicket','Rule9DetectActivatedOrders']
+          extracted = {}
+          for name in names:
+              rx = re.compile(r'(?m)^((?:bool|void|double|int)[ \t]+' + re.escape(name) + r'[ \t]*\([^\n]*\n)')
+              m = rx.search(text)
+              if not m:
+                  raise SystemExit('Missing R9 definition: ' + name)
+              extracted[name] = m.group(1).rstrip('\n')
+          new_text = text
+          for name in names:
+              rx = re.compile(r'(?m)^(?:bool|void|double|int)[ \t]+' + re.escape(name) + r'[ \t]*\([^\n]*\n')
+              new_text, count = rx.subn('', new_text, count=1)
+              if count != 1:
+                  raise SystemExit('Could not remove R9 definition: ' + name)
+          new_text = new_text.replace('// R9 helpers — unchanged business behavior.\n', '', 1)
+          include = '#include "../Engines/EAGOLD_R9.mqh"\n'
+          anchor = 'int RecoveryLevel(int direction){int count=CountDirectionPositions(direction);if(count<=1)return(0);return(count-1);}'
+          if include not in new_text:
+              p = new_text.find(anchor)
+              if p < 0:
+                  raise SystemExit('R9 include anchor not found')
+              p += len(anchor)
+              new_text = new_text[:p] + '\n' + include + new_text[p:]
+          lines = ['#ifndef EAGOLD_R9_MQH','#define EAGOLD_R9_MQH','','//==================================================================','// STAGE 4 — R9 EXPOSURE CONTROLLER','// Business behavior extracted from EAGOLD v0.106 without redesign.','//==================================================================','']
+          for name in names:
+              lines += [extracted[name], '']
+          lines.append('#endif')
+          mod.parent.mkdir(parents=True, exist_ok=True)
+          mod.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+          ptext = panel.read_text(encoding='utf-8')
+          ptext = ptext.replace('[DONE] 03 PERSISTENCE",4,clrYellow','[DONE] 03 PERSISTENCE",4,clrLime')
+          ptext = ptext.replace('[NEXT] 04 R9 EXPOSURE",5,clrSilver','[DONE] 04 R9 EXPOSURE",5,clrLime')
+          ptext = ptext.replace('[----] 05 R10 INTEGRATION",6,clrSilver','[NEXT] 05 R10 INTEGRATION",6,clrYellow')
+          ptext = ptext.replace('PROGRESS: 3 / 8  (37.5%)','PROGRESS: 4 / 8  (50.0%)')
+          panel.write_text(ptext, encoding='utf-8')
+          modtext = mod.read_text(encoding='utf-8')
+          for name in names:
+              rx = re.compile(r'(?m)^(?:bool|void|double|int)[ \t]+' + re.escape(name) + r'[ \t]*\(')
+              if not rx.search(modtext):
+                  raise SystemExit('R9 missing in module: ' + name)
+              if rx.search(new_text):
+                  raise SystemExit('R9 duplicate remains in EA: ' + name)
+          if include not in new_text:
+              raise SystemExit('R9 include missing from EA')
+          ea.write_text(new_text, encoding='utf-8')
+          print('Stage 4 R9 extraction validated.')
+          PY
+      - name: Commit stage 4
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add EA/EAGOLD.mq4 Engines/EAGOLD_R9.mqh UI/EAGOLD_ModularizationPanel.mqh
+          git diff --cached --check
+          git commit -m "refactor: modularize stage 4 R9 exposure"
+          git push
