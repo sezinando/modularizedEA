@@ -3,8 +3,13 @@
 
 // Extracted from authoritative EAGOLD v0.106 without behavioral changes.
 // Stage 1: order ownership, counting and exposure measurement.
+// MagicNumber == -1 is the explicit ALL SYMBOL ORDERS ownership mode.
 
-bool IsEAGOLDOrder(){return(OrderSymbol()==Symbol()&&OrderMagicNumber()==MagicNumber);}
+bool IsEAGOLDOrder(){
+   if(OrderSymbol()!=Symbol())return(false);
+   if(MagicNumber==-1)return(true);
+   return(OrderMagicNumber()==MagicNumber);
+}
 
 int CountOrdersByType(int type){int count=0;for(int i=OrdersTotal()-1;i>=0;i--){if(!OrderSelect(i,SELECT_BY_POS,MODE_TRADES))continue;if(!IsEAGOLDOrder())continue;if(OrderType()==type)count++;}return(count);}
 
