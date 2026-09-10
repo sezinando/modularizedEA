@@ -71,7 +71,7 @@ void EAGOLD_ModPanelBackground(bool visible,int height)
    }
    ObjectSetInteger(0,name,OBJPROP_XDISTANCE,6);
    ObjectSetInteger(0,name,OBJPROP_YDISTANCE,4);
-   ObjectSetInteger(0,name,OBJPROP_XSIZE,430);
+   ObjectSetInteger(0,name,OBJPROP_XSIZE,PanelBackgroundWidth);
    ObjectSetInteger(0,name,OBJPROP_YSIZE,height);
 }
 
