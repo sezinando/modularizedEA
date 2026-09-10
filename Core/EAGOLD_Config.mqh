@@ -71,6 +71,10 @@ input string INPUT_GROUP_PANEL="=== MODULAR PANEL / DEBUG ===";
 extern bool EnableModularizationPanel=true;
 extern bool EnableModularizationDebug=false;
 
+input string INPUT_GROUP_CHART_GUIDES="=== CHART BASKET GUIDES ===";
+extern bool EnableChartBasketGuides=true;
+extern int ChartBasketGuideOffsetBars=2;
+
 input string INPUT_GROUP_R9="=== R9 EXPOSURE CONTROLLER ===";
 extern bool EnableR9Hedge=true;
 extern double R9ExposureTriggerLots=1.00;
