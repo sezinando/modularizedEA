@@ -193,18 +193,18 @@ void EAGOLD_ModPanelUpdate()
    EAGOLD_ModPanelLabel("TITLE",StringFormat("EAGOLD v%s | OPERATIONAL PANEL",EAGOLD_VERSION),row++,clrWhite);
    EAGOLD_ModPanelLabel("SEP1","----------------------------------------------",row++,clrDimGray);
    if(MagicNumber==-1)
-      EAGOLD_ModPanelLabel("IDENT",StringFormat("SYMBOL %-8s  MAGIC -1  | TODOS",Symbol()),row++,clrYellow);
+      EAGOLD_ModPanelLabel("IDENT",StringFormat("SYMBOL %-8s   MAGIC %4d   | TODOS",Symbol(),MagicNumber),row++,clrYellow);
    else
-      EAGOLD_ModPanelLabel("IDENT",StringFormat("SYMBOL %-8s  MAGIC %d",Symbol(),MagicNumber),row++,clrAqua);
-   EAGOLD_ModPanelLabel("MARKET",StringFormat("BID %10s  ASK %10s",DoubleToString(Bid,Digits),DoubleToString(Ask,Digits)),row++,clrWhite);
+      EAGOLD_ModPanelLabel("IDENT",StringFormat("SYMBOL %-8s   MAGIC %4d",Symbol(),MagicNumber),row++,clrAqua);
+   EAGOLD_ModPanelLabel("MARKET",StringFormat("BID %10s   ASK %10s",DoubleToString(Bid,Digits),DoubleToString(Ask,Digits)),row++,clrWhite);
    color spreadColor=spreadAlert?clrTomato:clrLime;
-   EAGOLD_ModPanelLabel("SPREAD",StringFormat("SPREAD %6.1f pts / LIMIT %d",spreadPoints,SpreadLimit),row++,spreadColor);
+   EAGOLD_ModPanelLabel("SPREAD",StringFormat("SPREAD %6.1f pts   LIMIT %3d",spreadPoints,SpreadLimit),row++,spreadColor);
 
    EAGOLD_ModPanelLabel("SEP2","----------------------------------------------",row++,clrDimGray);
-   EAGOLD_ModPanelLabel("BUY",StringFormat("BUY   %3d pos   %6s lot   P/L %10s",buyCount,EAGOLD_ModPanelLots(buyLots),EAGOLD_ModPanelMoney(buyProfit)),row++,buyProfit>=0.0?clrLime:clrTomato);
-   EAGOLD_ModPanelLabel("SELL",StringFormat("SELL  %3d pos   %6s lot   P/L %10s",sellCount,EAGOLD_ModPanelLots(sellLots),EAGOLD_ModPanelMoney(sellProfit)),row++,sellProfit>=0.0?clrLime:clrTomato);
+   EAGOLD_ModPanelLabel("BUY",StringFormat("BUY  %3d pos   %6s lot   P/L %10s",buyCount,EAGOLD_ModPanelLots(buyLots),EAGOLD_ModPanelMoney(buyProfit)),row++,buyProfit>=0.0?clrLime:clrTomato);
+   EAGOLD_ModPanelLabel("SELL",StringFormat("SELL %3d pos   %6s lot   P/L %10s",sellCount,EAGOLD_ModPanelLots(sellLots),EAGOLD_ModPanelMoney(sellProfit)),row++,sellProfit>=0.0?clrLime:clrTomato);
    EAGOLD_ModPanelLabel("EXPOS",StringFormat("GROSS %6s   NET %6s",EAGOLD_ModPanelLots(grossLots),EAGOLD_ModPanelLots(netLots)),row++,clrWhite);
-   EAGOLD_ModPanelLabel("PENDING",StringFormat("PENDING   BUY %3d   SELL %3d",buyPending,sellPending),row++,clrSilver);
+   EAGOLD_ModPanelLabel("PENDING",StringFormat("PENDING  BUY %3d   SELL %3d",buyPending,sellPending),row++,clrSilver);
 
    EAGOLD_ModPanelLabel("SEP3","----------------------------------------------",row++,clrDimGray);
    EAGOLD_ModPanelLabel("TOTAL",StringFormat("TOTAL P/L %14s",EAGOLD_ModPanelMoney(totalProfit)),row++,totalProfit>=0.0?clrLime:clrTomato);
@@ -213,21 +213,21 @@ void EAGOLD_ModPanelUpdate()
    EAGOLD_ModPanelLabel("MIN",StringFormat("MENOR P/L   %11s",EAGOLD_ModPanelMoney(g_modPanelMinProfit)),row++,clrYellow);
    EAGOLD_ModPanelLabel("LOTS",StringFormat("LOTES ATUAIS %9s",EAGOLD_ModPanelLots(grossLots)),row++,clrWhite);
    EAGOLD_ModPanelLabel("MAXLOTS",StringFormat("MAIOR ACUM. %9s",EAGOLD_ModPanelLots(g_modPanelMaxLots)),row++,clrYellow);
-   EAGOLD_ModPanelLabel("DD",StringFormat("DD %11s  %.2f%%",EAGOLD_ModPanelMoney(currentDD),ddPct),row++,currentDD>0.0?clrYellow:clrLime);
+   EAGOLD_ModPanelLabel("DD",StringFormat("DD %11s  %6.2f%%",EAGOLD_ModPanelMoney(currentDD),ddPct),row++,currentDD>0.0?clrYellow:clrLime);
 
    EAGOLD_ModPanelLabel("SEP4","----------------------------------------------",row++,clrDimGray);
-   EAGOLD_ModPanelLabel("BE",StringFormat("AVG BUY %10s   AVG SELL %10s",buyBE>0.0?DoubleToString(buyBE,Digits):"-",sellBE>0.0?DoubleToString(sellBE,Digits):"-"),row++,clrSilver);
-   EAGOLD_ModPanelLabel("NEXT",StringFormat("NEXT BUY %10s   TAKE %10s",buyNext>0.0?DoubleToString(buyNext,Digits):"-",buyTake>0.0?DoubleToString(buyTake,Digits):"-"),row++,clrSilver);
-   EAGOLD_ModPanelLabel("NEXTS",StringFormat("NEXT SELL %10s   TAKE %10s",sellNext>0.0?DoubleToString(sellNext,Digits):"-",sellTake>0.0?DoubleToString(sellTake,Digits):"-"),row++,clrSilver);
-   EAGOLD_ModPanelLabel("HEDGE",g_r9HedgeActive?"HEDGE: ATIVO":"HEDGE: INATIVO",row++,g_r9HedgeActive?clrYellow:clrSilver);
-   EAGOLD_ModPanelLabel("R11",StringFormat("R11 STEP x %.2f   L%d = %s",EnableRecoveryStepMultiplier?RecoveryStepMultiplier:1.00,displayLevel,EAGOLD_ModPanelLots(RecoveryStepForLevel(displayLevel))),row++,EnableRecoveryStepMultiplier?clrAqua:clrSilver);
-   EAGOLD_ModPanelLabel("REC",StringFormat("RECOVERY B%d S%d L%d",RecoveryLevel(OP_BUY),RecoveryLevel(OP_SELL),recoveryLevel),row++,recoveryRemaining>0.0?clrYellow:clrLime);
-   EAGOLD_ModPanelLabel("RECD",StringFormat("DEBT %s   REM %s",EAGOLD_ModPanelMoney(recoveryDebt),EAGOLD_ModPanelMoney(recoveryRemaining)),row++,recoveryRemaining>0.0?clrYellow:clrSilver);
+   EAGOLD_ModPanelLabel("BE",StringFormat("AVG BUY  %10s   AVG SELL %10s",buyBE>0.0?DoubleToString(buyBE,Digits):"-",sellBE>0.0?DoubleToString(sellBE,Digits):"-"),row++,clrSilver);
+   EAGOLD_ModPanelLabel("NEXT",StringFormat("NEXT BUY %10s   TAKE BUY %10s",buyNext>0.0?DoubleToString(buyNext,Digits):"-",buyTake>0.0?DoubleToString(buyTake,Digits):"-"),row++,clrSilver);
+   EAGOLD_ModPanelLabel("NEXTS",StringFormat("NEXT SELL%10s   TAKE SELL%10s",sellNext>0.0?DoubleToString(sellNext,Digits):"-",sellTake>0.0?DoubleToString(sellTake,Digits):"-"),row++,clrSilver);
+   EAGOLD_ModPanelLabel("HEDGE",StringFormat("HEDGE     %s",g_r9HedgeActive?"ATIVO":"INATIVO"),row++,g_r9HedgeActive?clrYellow:clrSilver);
+   EAGOLD_ModPanelLabel("R11",StringFormat("R11 STEP x %4.2f   L%-2d = %s",EnableRecoveryStepMultiplier?RecoveryStepMultiplier:1.00,displayLevel,EAGOLD_ModPanelLots(RecoveryStepForLevel(displayLevel))),row++,EnableRecoveryStepMultiplier?clrAqua:clrSilver);
+   EAGOLD_ModPanelLabel("REC",StringFormat("RECOVERY  B%-2d S%-2d L%-2d",RecoveryLevel(OP_BUY),RecoveryLevel(OP_SELL),recoveryLevel),row++,recoveryRemaining>0.0?clrYellow:clrLime);
+   EAGOLD_ModPanelLabel("RECD",StringFormat("DEBT %10s   REM %10s",EAGOLD_ModPanelMoney(recoveryDebt),EAGOLD_ModPanelMoney(recoveryRemaining)),row++,recoveryRemaining>0.0?clrYellow:clrSilver);
 
    EAGOLD_ModPanelLabel("SEP5","----------------------------------------------",row++,clrDimGray);
-   EAGOLD_ModPanelLabel("BRX",StringFormat("BRX %-11s DIR %s  BI %s",EAGOLD_ModPanelBRXMode(),EAGOLD_ModPanelMoney(BRXDirectionalMinProfit),EAGOLD_ModPanelMoney(BRXBidirectionalMinProfit)),row++,clrAqua);
-   EAGOLD_ModPanelLabel("TRAIL",StringFormat("TRAIL %s  CD %.1fs  STEP %.1f",EAGOLD_ModPanelBool(EnableGlobalStopTrail),GlobalStopTrailCooldownSeconds,GlobalStopTrailMinStepPoints),row++,EnableGlobalStopTrail?clrAqua:clrSilver);
-   EAGOLD_ModPanelLabel("TIME",TimeToString(TimeCurrent(),TIME_SECONDS),row++,clrSilver);
+   EAGOLD_ModPanelLabel("BRX",StringFormat("BRX %-11s   DIR %6s   BI %6s",EAGOLD_ModPanelBRXMode(),EAGOLD_ModPanelMoney(BRXDirectionalMinProfit),EAGOLD_ModPanelMoney(BRXBidirectionalMinProfit)),row++,clrAqua);
+   EAGOLD_ModPanelLabel("TRAIL",StringFormat("TRAIL %-3s   CD %5.1fs   STEP %5.1f",EAGOLD_ModPanelBool(EnableGlobalStopTrail),GlobalStopTrailCooldownSeconds,GlobalStopTrailMinStepPoints),row++,EnableGlobalStopTrail?clrAqua:clrSilver);
+   EAGOLD_ModPanelLabel("TIME",StringFormat("TIME      %s",TimeToString(TimeCurrent(),TIME_SECONDS)),row++,clrSilver);
 
    if(EnableModularizationDebug)
    {
