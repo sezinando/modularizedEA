@@ -11,7 +11,6 @@ string EAGOLD_ModPanelLots(double value){return(DoubleToString(value,2));}
 string EAGOLD_ModPanelBool(bool value){return(value?"ON":"OFF");}
 
 // Shared calculation retained because EAGOLD_ChartBasketGuides.mqh consumes
-// the weighted breakeven value. This is not displayed in the panel.
 double EAGOLD_ModPanelWeightedBE(int direction)
 {
    double lots=0.0,weighted=0.0;
@@ -147,17 +146,22 @@ void EAGOLD_ModPanelUpdate()
    double recoveryDebt=R10RecoveryDebt();
    double recoveryRemaining=R10RecoveryRemainingDebt();
 
-   if(!g_modPanelInitialized)
-   {
-      g_modPanelMinProfit=totalProfit;
-      g_modPanelMaxLots=grossLots;
-      g_modPanelInitialized=true;
-   }
+   // Historical minimum/maximum are persisted in terminal GlobalVariables.
+   // MENOR P/L may only move downward; MAIOR ACUM. may only move upward.
+   string minKey=StateKey("PANEL_MIN_PROFIT");
+   string maxKey=StateKey("MAX_ACCUM_LOTS");
+   if(GlobalVariableCheck(minKey))
+      g_modPanelMinProfit=MathMin(GlobalVariableGet(minKey),totalProfit);
    else
-   {
-      if(totalProfit<g_modPanelMinProfit)g_modPanelMinProfit=totalProfit;
-      if(grossLots>g_modPanelMaxLots)g_modPanelMaxLots=grossLots;
-   }
+      g_modPanelMinProfit=totalProfit;
+   if(GlobalVariableCheck(maxKey))
+      g_modPanelMaxLots=MathMax(GlobalVariableGet(maxKey),grossLots);
+   else
+      g_modPanelMaxLots=grossLots;
+   GlobalVariableSet(minKey,g_modPanelMinProfit);
+   GlobalVariableSet(maxKey,g_modPanelMaxLots);
+   GlobalVariablesFlush();
+   g_modPanelInitialized=true;
 
    int row=0;
    EAGOLD_ModPanelBackground(true,EnableModularizationDebug?670:550);
