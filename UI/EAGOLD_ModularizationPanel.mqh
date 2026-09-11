@@ -132,7 +132,7 @@ void EAGOLD_ModPanelUpdate()
    double totalProfit=buyProfit+sellProfit;
    double grossLots=buyLots+sellLots;
    double netLots=MathAbs(buyLots-sellLots);
-   double accumulated=EAGOLDAccumulatedProfit();
+   double todayProfit=EAGOLDTodayProfit();
    double balance=AccountBalance();
    double equity=AccountEquity();
    double currentDD=MathMax(0.0,balance-equity);
@@ -199,7 +199,7 @@ void EAGOLD_ModPanelUpdate()
    EAGOLD_ModPanelLabel("SEP3","----------------------------------------------",row++,clrDimGray);
    EAGOLD_ModPanelLabel("TOTAL",StringFormat("TOTAL P/L %14s",EAGOLD_ModPanelMoney(totalProfit)),row++,totalProfit>=0.0?clrLime:clrTomato);
    EAGOLD_ModPanelLabel("EQUITY",StringFormat("EQUITY    %14s",EAGOLD_ModPanelMoney(equity)),row++,clrAqua);
-   EAGOLD_ModPanelLabel("ACCUM",StringFormat("LUCRO ACUM. %10s",EAGOLD_ModPanelMoney(accumulated)),row++,accumulated>=0.0?clrLime:clrTomato);
+   EAGOLD_ModPanelLabel("ACCUM",StringFormat("LUCRO DO DIA %9s",EAGOLD_ModPanelMoney(todayProfit)),row++,todayProfit>=0.0?clrLime:clrTomato);
    EAGOLD_ModPanelLabel("MIN",StringFormat("MENOR P/L   %11s",EAGOLD_ModPanelMoney(g_modPanelMinProfit)),row++,clrYellow);
    EAGOLD_ModPanelLabel("LOTS",StringFormat("LOTES ATUAIS %9s",EAGOLD_ModPanelLots(grossLots)),row++,clrWhite);
    EAGOLD_ModPanelLabel("MAXLOTS",StringFormat("MAIOR ACUM. %9s",EAGOLD_ModPanelLots(g_modPanelMaxLots)),row++,clrYellow);
