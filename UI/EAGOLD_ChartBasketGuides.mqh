@@ -6,7 +6,7 @@
 // Compact operational guides anchored near the latest bar.
 // Display only: no execution logic is performed here.
 // Only BUY and SELL weighted-average prices are displayed.
-// Direction is identified exclusively by line/text color.
+// Direction is identified exclusively by line color.
 //==================================================================
 
 string EAGOLD_CHART_GUIDE_PREFIX="EAGOLD_CHART_GUIDE_";
@@ -38,6 +38,7 @@ void EAGOLD_ChartGuideLineSet(string id,datetime startTime,datetime endTime,doub
    if(price<=0.0)return;
    string lineName=EAGOLD_CHART_GUIDE_PREFIX+id+"_LINE";
    string textName=EAGOLD_CHART_GUIDE_PREFIX+id+"_TEXT";
+
    if(ObjectFind(0,lineName)<0)
    {
       if(!ObjectCreate(0,lineName,OBJ_TREND,0,startTime,price,endTime,price))return;
@@ -53,21 +54,9 @@ void EAGOLD_ChartGuideLineSet(string id,datetime startTime,datetime endTime,doub
    ObjectMove(0,lineName,1,endTime,price);
    ObjectSetInteger(0,lineName,OBJPROP_COLOR,clr);
 
-   if(ObjectFind(0,textName)<0)
-   {
-      if(!ObjectCreate(0,textName,OBJ_TEXT,0,endTime,price))return;
-      ObjectSetString(0,textName,OBJPROP_FONT,EAGOLD_CHART_GUIDE_FONT);
-      ObjectSetInteger(0,textName,OBJPROP_FONTSIZE,EAGOLD_CHART_GUIDE_FONT_SIZE);
-      ObjectSetInteger(0,textName,OBJPROP_ANCHOR,ANCHOR_CENTER);
-      ObjectSetInteger(0,textName,OBJPROP_SELECTABLE,false);
-      ObjectSetInteger(0,textName,OBJPROP_SELECTED,false);
-      ObjectSetInteger(0,textName,OBJPROP_HIDDEN,true);
-      ObjectSetInteger(0,textName,OBJPROP_BACK,false);
-      ObjectSetInteger(0,textName,OBJPROP_ZORDER,2);
-   }
-   ObjectMove(0,textName,0,endTime,price);
-   ObjectSetString(0,textName,OBJPROP_TEXT,text);
-   ObjectSetInteger(0,textName,OBJPROP_COLOR,clr);
+   // The guide is intentionally line-only. Remove any text object created
+   // by the previous versions so no price legend remains on the chart.
+   if(ObjectFind(0,textName)>=0)ObjectDelete(0,textName);
 }
 
 void EAGOLD_ChartGuideDelete(string id)
@@ -96,14 +85,14 @@ void EAGOLD_ChartBasketGuidesUpdate()
    double sellBE=EAGOLD_ChartGuideAverage(OP_SELL);
 
    // Direction is intentionally communicated by color only.
-   // No BUY/SELL legend is placed on the chart.
+   // No BUY/SELL legend or price label is placed on the chart.
    if(buyBE>0.0)
-      EAGOLD_ChartGuideLineSet("BUY_AVG",lineStart,labelTime,buyBE,EAGOLD_ChartGuidePrice(buyBE),clrLime);
+      EAGOLD_ChartGuideLineSet("BUY_AVG",lineStart,labelTime,buyBE,"",clrLime);
    else
       EAGOLD_ChartGuideDelete("BUY_AVG");
 
    if(sellBE>0.0)
-      EAGOLD_ChartGuideLineSet("SELL_AVG",lineStart,labelTime,sellBE,EAGOLD_ChartGuidePrice(sellBE),clrTomato);
+      EAGOLD_ChartGuideLineSet("SELL_AVG",lineStart,labelTime,sellBE,"",clrTomato);
    else
       EAGOLD_ChartGuideDelete("SELL_AVG");
 
