@@ -159,6 +159,13 @@ extern double R11BlockGrossExposureLots=12.00;
 extern double R11MinNetToGrossRatio=0.10;
 extern double R11MinRecoveryLotFactor=0.25;
 
+input string INPUT_GROUP_PERSISTENCE="=== PERSISTENCE / CHECKPOINT POLICY ===";
+// Strategic state is persisted only on meaningful changes. A new worst-equity
+// checkpoint is considered meaningful when it moves by at least this amount.
+// Smaller changes remain in RAM and are persisted at the next significant event
+// or forced lifecycle checkpoint (OnDeinit).
+extern double PersistenceWorstEquityStep=5.00;
+
 input string INPUT_GROUP_UI="=== UI / PANEL ===";
 extern int PanelBackgroundX=260;
 extern int PanelBackgroundY=8;
