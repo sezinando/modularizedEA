@@ -44,4 +44,22 @@ int HeavyDirection(){double b=DirectionLots(OP_BUY),s=DirectionLots(OP_SELL);if(
 
 double EAGOLDAccumulatedProfit(){double total=0.0;for(int i=OrdersHistoryTotal()-1;i>=0;i--){if(!OrderSelect(i,SELECT_BY_POS,MODE_HISTORY))continue;if(!IsEAGOLDOrder())continue;int type=OrderType();if(type==OP_BUY||type==OP_SELL)total+=OrderProfit()+OrderSwap()+OrderCommission();}return(total);}
 
+// Closed EAGOLD result for the current broker/server day only.
+double EAGOLDTodayProfit(){
+   double total=0.0;
+   datetime dayStart=StringToTime(TimeToString(TimeCurrent(),TIME_DATE));
+   datetime now=TimeCurrent();
+   for(int i=OrdersHistoryTotal()-1;i>=0;i--)
+   {
+      if(!OrderSelect(i,SELECT_BY_POS,MODE_HISTORY))continue;
+      if(!IsEAGOLDOrder())continue;
+      int type=OrderType();
+      if(type!=OP_BUY&&type!=OP_SELL)continue;
+      datetime closeTime=OrderCloseTime();
+      if(closeTime<dayStart||closeTime>now)continue;
+      total+=OrderProfit()+OrderSwap()+OrderCommission();
+   }
+   return(total);
+}
+
 #endif
