@@ -112,7 +112,7 @@ void EAGOLD_ChartGuideLineSet(string id,datetime startTime,datetime endTime,doub
       if(!ObjectCreate(0,textName,OBJ_TEXT,0,endTime,price))return;
       ObjectSetString(0,textName,OBJPROP_FONT,EAGOLD_CHART_GUIDE_FONT);
       ObjectSetInteger(0,textName,OBJPROP_FONTSIZE,EAGOLD_CHART_GUIDE_FONT_SIZE);
-      ObjectSetInteger(0,textName,OBJPROP_ANCHOR,ANCHOR_LEFT);
+      ObjectSetInteger(0,textName,OBJPROP_ANCHOR,ANCHOR_CENTER);
       ObjectSetInteger(0,textName,OBJPROP_SELECTABLE,false);
       ObjectSetInteger(0,textName,OBJPROP_SELECTED,false);
       ObjectSetInteger(0,textName,OBJPROP_HIDDEN,true);
@@ -155,32 +155,32 @@ void EAGOLD_ChartBasketGuidesUpdate()
    double sellTake=EAGOLD_ChartGuideNextTake(OP_SELL);
 
    if(buyBE>0.0)
-      EAGOLD_ChartGuideLineSet("BUY_AVG",lineStart,labelTime,buyBE,"BUY AVG "+EAGOLD_ChartGuidePrice(buyBE),clrSilver);
+      EAGOLD_ChartGuideLineSet("BUY_AVG",lineStart,labelTime,buyBE,"BUY AVG",clrSilver);
    else
       EAGOLD_ChartGuideDelete("BUY_AVG");
 
    if(buyPending>0)
-      EAGOLD_ChartGuideLineSet("BUY_NEXT",lineStart,labelTime,buyNext,"BUY NEXT "+EAGOLD_ChartGuidePrice(buyNext),clrDimGray);
+      EAGOLD_ChartGuideLineSet("BUY_NEXT",lineStart,labelTime,buyNext,"BUY NEXT",clrDimGray);
    else
       EAGOLD_ChartGuideDelete("BUY_NEXT");
 
    if(buyTake>0.0)
-      EAGOLD_ChartGuideLineSet("BUY_TAKE",lineStart,labelTime,buyTake,"BUY TAKE "+EAGOLD_ChartGuidePrice(buyTake),clrAqua);
+      EAGOLD_ChartGuideLineSet("BUY_TAKE",lineStart,labelTime,buyTake,"BUY TAKE",clrAqua);
    else
       EAGOLD_ChartGuideDelete("BUY_TAKE");
 
    if(sellBE>0.0)
-      EAGOLD_ChartGuideLineSet("SELL_AVG",lineStart,labelTime,sellBE,"SELL AVG "+EAGOLD_ChartGuidePrice(sellBE),clrSilver);
+      EAGOLD_ChartGuideLineSet("SELL_AVG",lineStart,labelTime,sellBE,"SELL AVG",clrSilver);
    else
       EAGOLD_ChartGuideDelete("SELL_AVG");
 
    if(sellPending>0)
-      EAGOLD_ChartGuideLineSet("SELL_NEXT",lineStart,labelTime,sellNext,"SELL NEXT "+EAGOLD_ChartGuidePrice(sellNext),clrDimGray);
+      EAGOLD_ChartGuideLineSet("SELL_NEXT",lineStart,labelTime,sellNext,"SELL NEXT",clrDimGray);
    else
       EAGOLD_ChartGuideDelete("SELL_NEXT");
 
    if(sellTake>0.0)
-      EAGOLD_ChartGuideLineSet("SELL_TAKE",lineStart,labelTime,sellTake,"SELL TAKE "+EAGOLD_ChartGuidePrice(sellTake),clrAqua);
+      EAGOLD_ChartGuideLineSet("SELL_TAKE",lineStart,labelTime,sellTake,"SELL TAKE",clrAqua);
    else
       EAGOLD_ChartGuideDelete("SELL_TAKE");
 
