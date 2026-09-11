@@ -38,7 +38,6 @@ bool R10RecoveryAllowBasketClose(int direction){if(!EnableR10RecoveryRealization
 double R11GrossExposureLots(){return(DirectionLots(OP_BUY)+DirectionLots(OP_SELL));}
 
 double R11NetExposureLots(){return(MathAbs(DirectionLots(OP_BUY)-DirectionLots(OP_SELL)));}
-
 double R11NetToGrossRatio(){double gross=R11GrossExposureLots();if(gross<=0.0)return(1.0);return(R11NetExposureLots()/gross);}
 
 double R11RecoveryLotFactor(){
@@ -48,7 +47,9 @@ double R11RecoveryLotFactor(){
    double taper=R11TaperStartGrossExposureLots;
    double minRatio=R11MinNetToGrossRatio;
    if(block>0.0&&gross>=block)return(0.0);
-   if(minRatio>0.0&&gross>0.0&&R11NetToGrossRatio()<minRatio)return(0.0);
+   // A low net/gross ratio is treated as overload only once the basket
+   // has reached the taper region; small balanced baskets are unaffected.
+   if(gross>=taper&&minRatio>0.0&&gross>0.0&&R11NetToGrossRatio()<minRatio)return(0.0);
    if(block<=taper||block<=0.0||gross<=taper)return(1.0);
    double minFactor=R11MinRecoveryLotFactor;
    if(minFactor<0.0)minFactor=0.0;
