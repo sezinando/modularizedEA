@@ -29,6 +29,7 @@ double PointsToPrice(double points){return(points*Point);}
 double NormalizePrice(double price){return(NormalizeDouble(price,Digits));}
 double NormalizeLot(double lot){if(lot<Lot)lot=Lot;if(MaxOpenLot>0.0&&lot>MaxOpenLot)lot=MaxOpenLot;return(NormalizeDouble(lot,DigitsLots));}
 
+#include "../UI/EAGOLD_RealizationCascade.mqh"
 #include "../Engines/EAGOLD_R9.mqh"
 #include "../Engines/EAGOLD_R10.mqh"
 #include "../Engines/EAGOLD_Recovery.mqh"
@@ -143,21 +144,16 @@ void CreateEngineActionMarker(string engine,string action,int direction,double l
    ChartRedraw(0);
 }
 
-int OnInit(){bool reloadPersistedConfig=(GlobalVariableCheck(ConfigKey("RELOAD_ON_REINIT"))&&GlobalVariableGet(ConfigKey("RELOAD_ON_REINIT"))>0.5);if(reloadPersistedConfig){LoadPersistedConfig();GlobalVariableSet(ConfigKey("RELOAD_ON_REINIT"),0.0);}else if(!GlobalVariableCheck(ConfigKey("CONFIG_INITIALIZED"))){PersistConfigState();}ArrayResize(g_r9ProcessedTickets,0);g_r9HedgeActive=false;g_r10LastAction=0;if(EnableR10RecoveryRealization){string r10Key=StateKey("g_r10RecoveryCycleActive");if(GlobalVariableCheck(r10Key)){g_r10RecoveryCycleActive=(GlobalVariableGet(r10Key)>0.5);g_r10RecoveryStartEquity=GlobalVariableGet(StateKey("g_r10RecoveryStartEquity"));g_r10RecoveryWorstEquity=GlobalVariableGet(StateKey("g_r10RecoveryWorstEquity"));}}g_r1LastDecision="DISABLED";g_r1LastReason="";g_r1LastDecisionTime=0;R13ResetObserverState(g_r13Observer);R9SeedExistingPositions();R13Observe(g_r13Observer);EAGOLD_ModPanelUpdate();EAGOLD_ChartBasketGuidesUpdate();PersistAllState(true);Print(EA_NAME," v0.106 initialized. R1 Admission Gate=",EnableR1AdmissionGate,"; R1 Broker=",EnableR1BrokerGuard," Lot=",EnableR1LotGuard," Margin=",EnableR1MarginGuard," TradePermission=",EnableR1TradePermissionGuard,"; R12 telemetry active; R13 observer/trading active=",EnableR13,"/",EnableR13Trading," auto=",EnableR13AutoActivation,"; event-driven Global Variables; R11 dynamic recovery step multiplier active=",EnableRecoveryStepMultiplier," multiplier=",DoubleToString(RecoveryStepMultiplier,2)," max=",DoubleToString(RecoveryStepMax,1),"; GLOBAL STOP TRAILING; ENGINE ACTION MARKERS active=",EnableEngineActionMarkers,".");CreateFirstOrdersIfFlat();R13Observe(g_r13Observer);EAGOLD_ModPanelUpdate();EAGOLD_ChartBasketGuidesUpdate();PersistAllState(true);return(INIT_SUCCEEDED);}
+int OnInit(){bool reloadPersistedConfig=(GlobalVariableCheck(ConfigKey("RELOAD_ON_REINIT"))&&GlobalVariableGet(ConfigKey("RELOAD_ON_REINIT"))>0.5);if(reloadPersistedConfig){LoadPersistedConfig();GlobalVariableSet(ConfigKey("RELOAD_ON_REINIT"),0.0);}else if(!GlobalVariableCheck(ConfigKey("CONFIG_INITIALIZED"))){PersistConfigState();}ArrayResize(g_r9ProcessedTickets,0);g_r9HedgeActive=false;g_r10LastAction=0;if(EnableR10RecoveryRealization){string r10Key=StateKey("g_r10RecoveryCycleActive");if(GlobalVariableCheck(r10Key)){g_r10RecoveryCycleActive=(GlobalVariableGet(r10Key)>0.5);g_r10RecoveryStartEquity=GlobalVariableGet(StateKey("g_r10RecoveryStartEquity"));g_r10RecoveryWorstEquity=GlobalVariableGet(StateKey("g_r10RecoveryWorstEquity"));}}g_r1LastDecision="DISABLED";g_r1LastReason="";g_r1LastDecisionTime=0;R13ResetObserverState(g_r13Observer);R9SeedExistingPositions();R13Observe(g_r13Observer);EAGOLD_ModPanelUpdate();EAGOLD_RealizationCascadeUpdate();EAGOLD_ChartBasketGuidesUpdate();PersistAllState(true);Print(EA_NAME," v0.106 initialized. R1 Admission Gate=",EnableR1AdmissionGate,"; R1 Broker=",EnableR1BrokerGuard," Lot=",EnableR1LotGuard," Margin=",EnableR1MarginGuard," TradePermission=",EnableR1TradePermissionGuard,"; R12 telemetry active; R13 observer/trading active=",EnableR13,"/",EnableR13Trading," auto=",EnableR13AutoActivation,"; event-driven Global Variables; R11 dynamic recovery step multiplier active=",EnableRecoveryStepMultiplier," multiplier=",DoubleToString(RecoveryStepMultiplier,2)," max=",DoubleToString(RecoveryStepMax,1),"; GLOBAL STOP TRAILING; ENGINE ACTION MARKERS active=",EnableEngineActionMarkers,".");CreateFirstOrdersIfFlat();R13Observe(g_r13Observer);EAGOLD_ModPanelUpdate();EAGOLD_RealizationCascadeUpdate();EAGOLD_ChartBasketGuidesUpdate();PersistAllState(true);return(INIT_SUCCEEDED);}
 void OnDeinit(const int reason){
-   // Persist only strategic/non-reconstructible state on unload. Runtime
-   // telemetry is intentionally not written to GlobalVariables.
    PersistAllState(true);
    bool chartChange=(reason==REASON_CHARTCHANGE);
    if(!chartChange)PersistConfigState();
-
-   // Only request a configuration reload when the configuration itself may
-   // need to survive a full reinitialization. A chart-period change must use
-   // the values supplied by MT4 for the current EA instance.
    bool restore=(reason==REASON_CLOSE||reason==REASON_CHARTCLOSE||reason==REASON_RECOMPILE);
    GlobalVariableSet(ConfigKey("RELOAD_ON_REINIT"),restore?1.0:0.0);
    GlobalVariablesFlush();
+   EAGOLD_RealizationCascadeDelete();
    EAGOLD_ChartBasketGuidesDelete();
    EAGOLD_ModPanelDelete();
 }
-void OnTick(){R10RecoveryUpdateState();Rule9DetectActivatedOrders();BuyMachine();SellMachine();CreateFirstOrdersIfFlat();TrailAllStopOrders();R13Observe(g_r13Observer);EAGOLD_ModPanelUpdate();EAGOLD_ChartBasketGuidesUpdate();PersistAllState(false);}
+void OnTick(){R10RecoveryUpdateState();Rule9DetectActivatedOrders();BuyMachine();SellMachine();CreateFirstOrdersIfFlat();TrailAllStopOrders();R13Observe(g_r13Observer);EAGOLD_ModPanelUpdate();EAGOLD_RealizationCascadeUpdate();EAGOLD_ChartBasketGuidesUpdate();PersistAllState(false);}
