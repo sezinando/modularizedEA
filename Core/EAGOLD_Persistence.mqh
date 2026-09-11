@@ -37,7 +37,9 @@ void PersistStrategicState(bool force=false)
    static double lastCycle=0.0,lastStart=0.0,lastWorst=0.0,lastAction=0.0,lastHedge=0.0;
    double cycle=g_r10RecoveryCycleActive?1.0:0.0;
    double hedge=g_r9HedgeActive?1.0:0.0;
-   bool changed=force||!initialized||MathAbs(lastCycle-cycle)>0.0000001||MathAbs(lastStart-g_r10RecoveryStartEquity)>0.0000001||MathAbs(lastWorst-g_r10RecoveryWorstEquity)>0.0000001||MathAbs(lastAction-(double)g_r10LastAction)>0.0000001||MathAbs(lastHedge-hedge)>0.0000001;
+   double worstDelta=MathAbs(lastWorst-g_r10RecoveryWorstEquity);
+   bool worstSignificant=(worstDelta>=1.0);
+   bool changed=force||!initialized||MathAbs(lastCycle-cycle)>0.0000001||MathAbs(lastStart-g_r10RecoveryStartEquity)>0.0000001||worstSignificant||MathAbs(lastAction-(double)g_r10LastAction)>0.0000001||MathAbs(lastHedge-hedge)>0.0000001;
    if(!changed)return;
    GlobalVariableSet(StateKey("g_r10RecoveryCycleActive"),cycle);
    GlobalVariableSet(StateKey("g_r10RecoveryStartEquity"),g_r10RecoveryStartEquity);
