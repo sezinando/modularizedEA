@@ -2,15 +2,21 @@
 #define EAGOLD_BRX_MQH
 
 //==================================================================
-// BRX v1.0 — BASKET REALIZATION ENGINE
+// BRX v1.1 — BASKET REALIZATION ENGINE
 // Replaces the legacy count * TakeProfit basket target when enabled.
 // Modes: 0 legacy, 1 directional, 2 bidirectional, 3 hybrid.
-// Uses realized/net floating P/L, exposure and recovery gate.
+// A realization is authorized only when the projected net result remains
+// above the configured profit floor plus the execution safety buffer.
 //==================================================================
 
 double BRX_DirectionalProfit(int direction){return(DirectionBasketProfit(direction));}
 
 double BRX_BasketProfit(){return(DirectionBasketProfit(OP_BUY)+DirectionBasketProfit(OP_SELL));}
+
+double BRX_RealizationBuffer(){double b=BRXRealizationSafetyBuffer;if(b<0.0)b=0.0;return(b);}
+
+double BRX_DirectionalFloor(){return(MathMax(0.0,BRXDirectionalMinProfit));}
+double BRX_BidirectionalFloor(){return(MathMax(0.0,BRXBidirectionalMinProfit));}
 
 double BRX_WeightedBreakeven(int direction){
    int type=(direction==OP_BUY?OP_BUY:OP_SELL);
@@ -35,20 +41,23 @@ bool BRX_BEDirectionValid(int direction){
    return(Bid<=be-buffer);
 }
 
-bool BRX_RecoveryAllowed(int direction){
-   return(R10RecoveryAllowBasketClose(direction));
-}
+bool BRX_RecoveryAllowed(int direction){return(R10RecoveryAllowBasketClose(direction));}
 
 bool BRX_CloseDirection(int direction){
    if(CountDirectionPositions(direction)<=0)return(false);
    if(!CanCloseLightBasket(direction))return(false);
    if(!BRX_RecoveryAllowed(direction))return(false);
    double before=BRX_DirectionalProfit(direction);
+   double required=BRX_DirectionalFloor()+BRX_RealizationBuffer();
+   if(before<required){
+      Print(EA_NAME," BRX HOLD: directional floor not protected. direction=",(direction==OP_BUY?"BUY":"SELL")," profit=",DoubleToString(before,2)," required=",DoubleToString(required,2));
+      return(false);
+   }
    bool closed=CloseDirectionPositionsRobust(direction);
    if(closed){
       CloseAllDirectionPending(direction);
-      Print(EA_NAME," BRX DIRECTIONAL CLOSE: direction=",(direction==OP_BUY?"BUY":"SELL")," profit=",DoubleToString(before,2));
-      CreateEngineActionMarker("BRX","DIRECTIONAL",direction,DirectionLots(direction));
+      Print(EA_NAME," BRX DIRECTIONAL CLOSE: direction=",(direction==OP_BUY?"BUY":"SELL")," profitBefore=",DoubleToString(before,2)," floor=",DoubleToString(BRX_DirectionalFloor(),2));
+      CreateEngineActionMarker("BRX","DIRECTIONAL",direction,0.0);
    }else Print(EA_NAME," BRX DIRECTIONAL CLOSE FAILED: direction=",(direction==OP_BUY?"BUY":"SELL")," remaining=",CountDirectionPositions(direction));
    return(closed);
 }
@@ -57,17 +66,54 @@ bool BRX_CloseBasket(){
    int buyCount=CountDirectionPositions(OP_BUY),sellCount=CountDirectionPositions(OP_SELL);
    if(buyCount<=0&&sellCount<=0)return(false);
    if(!R10RecoveryAllowBasketClose(OP_BUY)||!R10RecoveryAllowBasketClose(OP_SELL))return(false);
+   double floor=BRX_BidirectionalFloor();
+   double required=floor+BRX_RealizationBuffer();
    double before=BRX_BasketProfit();
+   if(before<required){
+      Print(EA_NAME," BRX HOLD: basket floor not protected. profit=",DoubleToString(before,2)," required=",DoubleToString(required,2));
+      return(false);
+   }
+
+   // Close legs sequentially, but carry the already realized result into the
+   // projected basket result. The second leg is never closed if doing so would
+   // take the projected final basket below the configured profit floor.
+   double realized=0.0;
    bool buyOk=true,sellOk=true;
-   if(buyCount>0)buyOk=CloseDirectionPositionsRobust(OP_BUY);
-   if(sellCount>0)sellOk=CloseDirectionPositionsRobust(OP_SELL);
+   if(buyCount>0){
+      double buyBefore=BRX_DirectionalProfit(OP_BUY);
+      RefreshRates();
+      if(realized+buyBefore<floor){
+         Print(EA_NAME," BRX HOLD BUY LEG: projected basket result below floor. realized=",DoubleToString(realized,2)," buy=",DoubleToString(buyBefore,2)," floor=",DoubleToString(floor,2));
+         return(false);
+      }
+      buyOk=CloseDirectionPositionsRobust(OP_BUY);
+      if(!buyOk){
+         Print(EA_NAME," BRX BIDIRECTIONAL CLOSE FAILED on BUY: remaining=",CountDirectionPositions(OP_BUY));
+         return(false);
+      }
+      realized+=buyBefore;
+      CloseAllDirectionPending(OP_BUY);
+   }
+   if(sellCount>0){
+      double sellBefore=BRX_DirectionalProfit(OP_SELL);
+      RefreshRates();
+      if(realized+sellBefore<floor){
+         Print(EAGOLD," BRX HOLD SELL LEG: projected basket result below floor. realized=",DoubleToString(realized,2)," sell=",DoubleToString(sellBefore,2)," floor=",DoubleToString(floor,2));
+         return(false);
+      }
+      sellOk=CloseDirectionPositionsRobust(OP_SELL);
+      if(!sellOk){
+         Print(EA_NAME," BRX BIDIRECTIONAL CLOSE FAILED on SELL: remaining=",CountDirectionPositions(OP_SELL));
+         return(false);
+      }
+      realized+=sellBefore;
+      CloseAllDirectionPending(OP_SELL);
+   }
    if(buyOk&&sellOk){
-      CloseAllDirectionPending(OP_BUY);CloseAllDirectionPending(OP_SELL);
-      Print(EA_NAME," BRX BIDIRECTIONAL CLOSE: basketProfit=",DoubleToString(before,2)," buy=",buyCount," sell=",sellCount);
+      Print(EA_NAME," BRX BIDIRECTIONAL CLOSE: basketProfitBefore=",DoubleToString(before,2)," realizedProjected=",DoubleToString(realized,2)," floor=",DoubleToString(floor,2));
       CreateEngineActionMarker("BRX","BIDIRECTIONAL",HeavyDirection(),0.0);
       return(true);
    }
-   Print(EA_NAME," BRX BIDIRECTIONAL CLOSE FAILED: buyRemaining=",CountDirectionPositions(OP_BUY)," sellRemaining=",CountDirectionPositions(OP_SELL));
    return(false);
 }
 
@@ -75,7 +121,7 @@ bool BRX_DirectionalTargetReached(int direction){
    int count=CountDirectionPositions(direction);
    if(count<=1)return(false);
    double profit=BRX_DirectionalProfit(direction);
-   if(profit<BRXDirectionalMinProfit)return(false);
+   if(profit<BRX_DirectionalFloor()+BRX_RealizationBuffer())return(false);
    return(BRX_BEDirectionValid(direction));
 }
 
@@ -83,7 +129,7 @@ bool BRX_BidirectionalTargetReached(){
    int total=CountDirectionPositions(OP_BUY)+CountDirectionPositions(OP_SELL);
    if(total<2)return(false);
    double profit=BRX_BasketProfit();
-   if(profit<BRXBidirectionalMinProfit)return(false);
+   if(profit<BRX_BidirectionalFloor()+BRX_RealizationBuffer())return(false);
    return(true);
 }
 
