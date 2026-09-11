@@ -70,10 +70,16 @@ extern bool BRXRequireWeightedBE=false;
 extern double BRXWeightedBEBufferPoints=0.0;
 
 input string INPUT_GROUP_R13="=== R13 RECOVERY SATELLITE ===";
-// R13 is intentionally OFF by default. Configuration only: no execution is
-// authorized by this contract stage.
 extern bool EnableR13=false;
+// Observer remains the default. When true, R13 may open/close only its own
+// Satellite orders under the hard gates implemented in EAGOLD_R13_Satellite.
 extern bool EnableR13AutoActivation=false;
+extern bool EnableR13Trading=false;
+extern double R13ProfitTarget=5.00;
+extern double R13EntryCooldownSeconds=30.0;
+extern bool R13CloseWhenMasterFlat=true;
+extern bool EnableR13MasterAdjustment=true;
+extern double R13MasterAdjustmentMaxLots=0.20;
 // Must be distinct from the Master universe when R13 execution is enabled.
 extern int R13MagicNumber=3010;
 extern string R13OrderComment=EAGOLD_R13_DEFAULT_COMMENT;
@@ -88,9 +94,10 @@ extern int R13EndHour=23;
 // must be opposite to the Master dominant direction when Master is unbalanced.
 extern bool EnableR13DirectionalComplementarity=true;
 extern double R13MinDirectionalImbalance=0.01;
-// Fraction of realized R13 net P/L that may eventually become Recovery Capital.
-// Zero keeps capital transfer disabled during the initial implementation stages.
-extern double R13RecoveryCapitalFraction=0.0;
+// Fraction of realized R13 net P/L that may become Recovery Capital for a
+// subsequent Master average/exposure adjustment. 1.0 = 100% of realized
+// positive R13 net profit in this initial parallel operating mode.
+extern double R13RecoveryCapitalFraction=1.00;
 
 input string INPUT_GROUP_PANEL="=== MODULAR PANEL / DEBUG ===";
 extern bool EnableModularizationPanel=true;
