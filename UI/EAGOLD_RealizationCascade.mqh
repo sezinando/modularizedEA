@@ -2,9 +2,9 @@
 #define EAGOLD_REALIZATION_CASCADE_MQH
 
 //==================================================================
-// REALIZATION CASCADE
-// FIFO history of realized values. Each realization carries the color
-// of the engine that produced it. No legend is shown: color is the key.
+// EAGOLD SIDE CASCADES
+// FIFO histories beside the main panel. No legend: engine identity is
+// represented directly by its established color.
 //==================================================================
 #define EAGOLD_REALIZATION_CASCADE_MAX 30
 
@@ -13,100 +13,81 @@ double g_realizationCascadeValues[EAGOLD_REALIZATION_CASCADE_MAX];
 color g_realizationCascadeColors[EAGOLD_REALIZATION_CASCADE_MAX];
 int g_realizationCascadeCount=0;
 
-string EAGOLD_RealizationCascadeValue(double value){return(DoubleToString(value,2));}
+string g_actionCascadePrefix="EAGOLD_ACTION_CASCADE_";
+string g_actionCascadeEngine[EAGOLD_REALIZATION_CASCADE_MAX];
+datetime g_actionCascadeTime[EAGOLD_REALIZATION_CASCADE_MAX];
+color g_actionCascadeColors[EAGOLD_REALIZATION_CASCADE_MAX];
+int g_actionCascadeCount=0;
 
-void EAGOLD_RealizationCascadeRender()
+color CascadeEngineColor(string engine){if(engine=="R1")return(clrYellow);if(engine=="R1.1")return(clrBlue);if(engine=="R4")return(clrRed);if(engine=="R5")return(clrMagenta);if(engine=="BRX")return(clrAqua);if(engine=="R7")return(clrOrange);if(engine=="R10")return(clrViolet);if(engine=="R13")return(clrLime);return(clrWhite);}
+
+void EAGOLD_ActionCascadeAdd(string engine)
 {
-   string bgName=g_realizationCascadePrefix+"BG";
-   int rowHeight=16,panelWidth=78,panelHeight=EAGOLD_REALIZATION_CASCADE_MAX*rowHeight+8;
-   if(ObjectFind(0,bgName)<0)
-   {
-      if(!ObjectCreate(0,bgName,OBJ_RECTANGLE_LABEL,0,0,0))return;
-      ObjectSetInteger(0,bgName,OBJPROP_CORNER,CORNER_LEFT_UPPER);
-      ObjectSetInteger(0,bgName,OBJPROP_BORDER_TYPE,BORDER_FLAT);
-      ObjectSetInteger(0,bgName,OBJPROP_SELECTABLE,false);
-      ObjectSetInteger(0,bgName,OBJPROP_SELECTED,false);
-      ObjectSetInteger(0,bgName,OBJPROP_HIDDEN,true);
-      ObjectSetInteger(0,bgName,OBJPROP_BACK,false);
-      ObjectSetInteger(0,bgName,OBJPROP_BGCOLOR,clrBlack);
-      ObjectSetInteger(0,bgName,OBJPROP_COLOR,clrBlack);
-      ObjectSetInteger(0,bgName,OBJPROP_XSIZE,panelWidth);
-      ObjectSetInteger(0,bgName,OBJPROP_YSIZE,panelHeight);
-      ObjectSetInteger(0,bgName,OBJPROP_ZORDER,900);
-   }
-   int baseX=PanelBackgroundX+PanelBackgroundWidth+12;
-   int baseY=PanelBackgroundY;
-   ObjectSetInteger(0,bgName,OBJPROP_XDISTANCE,baseX);
-   ObjectSetInteger(0,bgName,OBJPROP_YDISTANCE,baseY);
-   ObjectSetInteger(0,bgName,OBJPROP_XSIZE,panelWidth);
-   ObjectSetInteger(0,bgName,OBJPROP_YSIZE,panelHeight);
-
-   for(int i=0;i<EAGOLD_REALIZATION_CASCADE_MAX;i++)
-   {
-      string valueName=g_realizationCascadePrefix+"V_"+IntegerToString(i);
-      string dotName=g_realizationCascadePrefix+"D_"+IntegerToString(i);
-      if(i<g_realizationCascadeCount)
-      {
-         int y=baseY+5+i*rowHeight;
-         if(ObjectFind(0,valueName)<0)ObjectCreate(0,valueName,OBJ_LABEL,0,0,0);
-         ObjectSetInteger(0,valueName,OBJPROP_CORNER,CORNER_LEFT_UPPER);
-         ObjectSetInteger(0,valueName,OBJPROP_SELECTABLE,false);
-         ObjectSetInteger(0,valueName,OBJPROP_SELECTED,false);
-         ObjectSetInteger(0,valueName,OBJPROP_HIDDEN,true);
-         ObjectSetInteger(0,valueName,OBJPROP_BACK,false);
-         ObjectSetInteger(0,valueName,OBJPROP_XDISTANCE,baseX+32);
-         ObjectSetInteger(0,valueName,OBJPROP_YDISTANCE,y);
-         ObjectSetInteger(0,valueName,OBJPROP_FONTSIZE,9);
-         ObjectSetString(0,valueName,OBJPROP_FONT,"Impact");
-         ObjectSetInteger(0,valueName,OBJPROP_COLOR,g_realizationCascadeColors[i]);
-         ObjectSetInteger(0,valueName,OBJPROP_ZORDER,901);
-         ObjectSetString(0,valueName,OBJPROP_TEXT,EAGOLD_RealizationCascadeValue(g_realizationCascadeValues[i]));
-
-         if(ObjectFind(0,dotName)<0)ObjectCreate(0,dotName,OBJ_LABEL,0,0,0);
-         ObjectSetInteger(0,dotName,OBJPROP_CORNER,CORNER_LEFT_UPPER);
-         ObjectSetInteger(0,dotName,OBJPROP_SELECTABLE,false);
-         ObjectSetInteger(0,dotName,OBJPROP_SELECTED,false);
-         ObjectSetInteger(0,dotName,OBJPROP_HIDDEN,true);
-         ObjectSetInteger(0,dotName,OBJPROP_BACK,false);
-         ObjectSetInteger(0,dotName,OBJPROP_XDISTANCE,baseX+8);
-         ObjectSetInteger(0,dotName,OBJPROP_YDISTANCE,y-1);
-         ObjectSetInteger(0,dotName,OBJPROP_FONTSIZE,9);
-         ObjectSetString(0,dotName,OBJPROP_FONT,"Arial");
-         ObjectSetInteger(0,dotName,OBJPROP_COLOR,g_realizationCascadeColors[i]);
-         ObjectSetInteger(0,dotName,OBJPROP_ZORDER,902);
-         ObjectSetString(0,dotName,OBJPROP_TEXT,"●");
-      }
-      else
-      {
-         ObjectDelete(0,valueName);
-         ObjectDelete(0,dotName);
-      }
-   }
-   ChartRedraw(0);
+   if(engine=="")return;
+   color c=CascadeEngineColor(engine);
+   int limit=MathMin(g_actionCascadeCount,EAGOLD_REALIZATION_CASCADE_MAX-1);
+   for(int i=limit;i>=1;i--){g_actionCascadeEngine[i]=g_actionCascadeEngine[i-1];g_actionCascadeTime[i]=g_actionCascadeTime[i-1];g_actionCascadeColors[i]=g_actionCascadeColors[i-1];}
+   g_actionCascadeEngine[0]=engine;g_actionCascadeTime[0]=TimeCurrent();g_actionCascadeColors[0]=c;
+   if(g_actionCascadeCount<EAGOLD_REALIZATION_CASCADE_MAX)g_actionCascadeCount++;
 }
 
 void EAGOLD_RealizationCascadeAdd(double realizedProfit,color engineColor=clrYellow)
 {
    if(MathAbs(realizedProfit)<0.000001)return;
    int limit=MathMin(g_realizationCascadeCount,EAGOLD_REALIZATION_CASCADE_MAX-1);
-   for(int i=limit;i>=1;i--)
-   {
-      g_realizationCascadeValues[i]=g_realizationCascadeValues[i-1];
-      g_realizationCascadeColors[i]=g_realizationCascadeColors[i-1];
-   }
-   g_realizationCascadeValues[0]=realizedProfit;
-   g_realizationCascadeColors[0]=engineColor;
+   for(int i=limit;i>=1;i--){g_realizationCascadeValues[i]=g_realizationCascadeValues[i-1];g_realizationCascadeColors[i]=g_realizationCascadeColors[i-1];}
+   g_realizationCascadeValues[0]=realizedProfit;g_realizationCascadeColors[0]=engineColor;
    if(g_realizationCascadeCount<EAGOLD_REALIZATION_CASCADE_MAX)g_realizationCascadeCount++;
-   EAGOLD_RealizationCascadeRender();
+   EAGOLD_RealizationCascadeUpdate();
 }
 
-void EAGOLD_RealizationCascadeUpdate(){if(!EnableModularizationPanel){EAGOLD_RealizationCascadeDelete();return;}if(g_realizationCascadeCount>0)EAGOLD_RealizationCascadeRender();}
+void EAGOLD_RealizationCascadeDelete(){ObjectsDeleteAll(0,g_realizationCascadePrefix);ObjectsDeleteAll(0,g_actionCascadePrefix);}
 
-void EAGOLD_RealizationCascadeDelete()
+void EAGOLD_RealizationCascadeUpdate()
 {
-   string bgName=g_realizationCascadePrefix+"BG";
-   ObjectDelete(0,bgName);
-   for(int i=0;i<EAGOLD_REALIZATION_CASCADE_MAX;i++){ObjectDelete(0,g_realizationCascadePrefix+"V_"+IntegerToString(i));ObjectDelete(0,g_realizationCascadePrefix+"D_"+IntegerToString(i));}
+   if(!EnableModularizationPanel){EAGOLD_RealizationCascadeDelete();return;}
+   if(g_realizationCascadeCount<1 && g_actionCascadeCount<1)return;
+   int baseX=PanelBackgroundX+PanelBackgroundWidth+12;
+   int baseY=PanelBackgroundY;
+   int rowHeight=16;
+   int headerHeight=20;
+
+   // ACTIONS — full 30-entry FIFO panel.
+   int actionX=baseX;
+   int actionWidth=118;
+   string actionBg=g_actionCascadePrefix+"BG";
+   if(ObjectFind(0,actionBg)<0)ObjectCreate(0,actionBg,OBJ_RECTANGLE_LABEL,0,0,0);
+   ObjectSetInteger(0,actionBg,OBJPROP_CORNER,CORNER_LEFT_UPPER);ObjectSetInteger(0,actionBg,OBJPROP_BORDER_TYPE,BORDER_FLAT);ObjectSetInteger(0,actionBg,OBJPROP_SELECTABLE,false);ObjectSetInteger(0,actionBg,OBJPROP_SELECTED,false);ObjectSetInteger(0,actionBg,OBJPROP_HIDDEN,true);ObjectSetInteger(0,actionBg,OBJPROP_XDISTANCE,actionX);ObjectSetInteger(0,actionBg,OBJPROP_YDISTANCE,baseY);ObjectSetInteger(0,actionBg,OBJPROP_XSIZE,actionWidth);ObjectSetInteger(0,actionBg,OBJPROP_YSIZE,headerHeight+EAGOLD_REALIZATION_CASCADE_MAX*rowHeight+8);ObjectSetInteger(0,actionBg,OBJPROP_BGCOLOR,clrBlack);ObjectSetInteger(0,actionBg,OBJPROP_COLOR,clrBlack);ObjectSetInteger(0,actionBg,OBJPROP_BACK,false);ObjectSetInteger(0,actionBg,OBJPROP_ZORDER,900);
+   for(int a=0;a<EAGOLD_REALIZATION_CASCADE_MAX;a++)
+   {
+      string an=g_actionCascadePrefix+IntegerToString(a);
+      if(a<g_actionCascadeCount)
+      {
+         if(ObjectFind(0,an)<0)ObjectCreate(0,an,OBJ_LABEL,0,0,0);
+         int ay=baseY+headerHeight+a*rowHeight;
+         ObjectSetInteger(0,an,OBJPROP_CORNER,CORNER_LEFT_UPPER);ObjectSetInteger(0,an,OBJPROP_SELECTABLE,false);ObjectSetInteger(0,an,OBJPROP_SELECTED,false);ObjectSetInteger(0,an,OBJPROP_HIDDEN,true);ObjectSetInteger(0,an,OBJPROP_BACK,false);ObjectSetInteger(0,an,OBJPROP_XDISTANCE,actionX+8);ObjectSetInteger(0,an,OBJPROP_YDISTANCE,ay);ObjectSetInteger(0,an,OBJPROP_FONTSIZE,8);ObjectSetString(0,an,OBJPROP_FONT,"Impact");ObjectSetInteger(0,an,OBJPROP_COLOR,g_actionCascadeColors[a]);ObjectSetInteger(0,an,OBJPROP_ZORDER,901);ObjectSetString(0,an,OBJPROP_TEXT,TimeToString(g_actionCascadeTime[a],TIME_SECONDS)+"  "+g_actionCascadeEngine[a]);
+      }else ObjectDelete(0,an);
+   }
+
+   // REALIZATIONS — values only, with a colored point identifying engine.
+   int realX=actionX+actionWidth+8;
+   int realWidth=78;
+   string realBg=g_realizationCascadePrefix+"BG";
+   if(ObjectFind(0,realBg)<0)ObjectCreate(0,realBg,OBJ_RECTANGLE_LABEL,0,0,0);
+   ObjectSetInteger(0,realBg,OBJPROP_CORNER,CORNER_LEFT_UPPER);ObjectSetInteger(0,realBg,OBJPROP_BORDER_TYPE,BORDER_FLAT);ObjectSetInteger(0,realBg,OBJPROP_SELECTABLE,false);ObjectSetInteger(0,realBg,OBJPROP_SELECTED,false);ObjectSetInteger(0,realBg,OBJPROP_HIDDEN,true);ObjectSetInteger(0,realBg,OBJPROP_XDISTANCE,realX);ObjectSetInteger(0,realBg,OBJPROP_YDISTANCE,baseY);ObjectSetInteger(0,realBg,OBJPROP_XSIZE,realWidth);ObjectSetInteger(0,realBg,OBJPROP_YSIZE,headerHeight+EAGOLD_REALIZATION_CASCADE_MAX*rowHeight+8);ObjectSetInteger(0,realBg,OBJPROP_BGCOLOR,clrBlack);ObjectSetInteger(0,realBg,OBJPROP_COLOR,clrBlack);ObjectSetInteger(0,realBg,OBJPROP_BACK,false);ObjectSetInteger(0,realBg,OBJPROP_ZORDER,900);
+   for(int r=0;r<EAGOLD_REALIZATION_CASCADE_MAX;r++)
+   {
+      string vn=g_realizationCascadePrefix+"V_"+IntegerToString(r);string dn=g_realizationCascadePrefix+"D_"+IntegerToString(r);
+      if(r<g_realizationCascadeCount)
+      {
+         int ry=baseY+headerHeight+r*rowHeight;
+         if(ObjectFind(0,vn)<0)ObjectCreate(0,vn,OBJ_LABEL,0,0,0);
+         ObjectSetInteger(0,vn,OBJPROP_CORNER,CORNER_LEFT_UPPER);ObjectSetInteger(0,vn,OBJPROP_SELECTABLE,false);ObjectSetInteger(0,vn,OBJPROP_HIDDEN,true);ObjectSetInteger(0,vn,OBJPROP_XDISTANCE,realX+32);ObjectSetInteger(0,vn,OBJPROP_YDISTANCE,ry);ObjectSetInteger(0,vn,OBJPROP_FONTSIZE,9);ObjectSetString(0,vn,OBJPROP_FONT,"Impact");ObjectSetInteger(0,vn,OBJPROP_COLOR,clrYellow);ObjectSetInteger(0,vn,OBJPROP_ZORDER,901);ObjectSetString(0,vn,OBJPROP_TEXT,DoubleToString(g_realizationCascadeValues[r],2));
+         if(ObjectFind(0,dn)<0)ObjectCreate(0,dn,OBJ_LABEL,0,0,0);
+         ObjectSetInteger(0,dn,OBJPROP_CORNER,CORNER_LEFT_UPPER);ObjectSetInteger(0,dn,OBJPROP_SELECTABLE,false);ObjectSetInteger(0,dn,OBJPROP_HIDDEN,true);ObjectSetInteger(0,dn,OBJPROP_XDISTANCE,realX+8);ObjectSetInteger(0,dn,OBJPROP_YDISTANCE,ry-1);ObjectSetInteger(0,dn,OBJPROP_FONTSIZE,9);ObjectSetString(0,dn,OBJPROP_FONT,"Arial");ObjectSetInteger(0,dn,OBJPROP_COLOR,g_realizationCascadeColors[r]);ObjectSetInteger(0,dn,OBJPROP_ZORDER,902);ObjectSetString(0,dn,OBJPROP_TEXT,"●");
+      }else{ObjectDelete(0,vn);ObjectDelete(0,dn);}
+   }
+   ChartRedraw(0);
 }
 
 #endif
