@@ -145,10 +145,16 @@ extern double R10RecoveryProfitTarget=50.0;
 extern double R10RecoveryDebtTargetPercent=0.0;
 extern bool R10RecoveryRequireDebtRepaid=true;
 
-input string INPUT_GROUP_R11="=== R11 RECOVERY STEP CONTROL ===";
+input string INPUT_GROUP_R11="=== R11 RECOVERY STEP / EXPOSURE GOVERNOR ===";
 extern bool EnableRecoveryStepMultiplier=true;
 extern double RecoveryStepMultiplier=1.15;
 extern double RecoveryStepMax=500.0;
+// R11 controls only NEW recovery exposure. Existing positions remain under R10/R9.
+extern bool EnableR11ExposureGovernor=true;
+extern double R11TaperStartGrossExposureLots=8.00;
+extern double R11BlockGrossExposureLots=12.00;
+extern double R11MinNetToGrossRatio=0.10;
+extern double R11MinRecoveryLotFactor=0.25;
 
 input string INPUT_GROUP_UI="=== UI / PANEL ===";
 extern int PanelBackgroundX=260;
