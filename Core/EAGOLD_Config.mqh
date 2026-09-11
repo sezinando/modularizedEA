@@ -74,6 +74,9 @@ extern bool EnableBasketRealization=true;
 extern int BRXRealizationMode=3;
 extern double BRXDirectionalMinProfit=5.00;
 extern double BRXBidirectionalMinProfit=5.00;
+// Extra floating-P/L cushion required before a realization is authorized.
+// This protects the realization floor against normal execution movement/slippage.
+extern double BRXRealizationSafetyBuffer=5.00;
 extern bool BRXRequireWeightedBE=false;
 extern double BRXWeightedBEBufferPoints=0.0;
 
