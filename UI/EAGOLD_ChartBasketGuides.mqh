@@ -3,11 +3,15 @@
 
 //==================================================================
 // CHART BASKET GUIDES
-// Discreet operational information anchored near the latest bar.
+// Compact operational guides anchored near the latest bar.
 // Display only: no execution logic is performed here.
+// AVG / NEXT / TAKE are represented by horizontal guide lines with
+// a compact legend at the right edge instead of long text labels.
 //==================================================================
 
 string EAGOLD_CHART_GUIDE_PREFIX="EAGOLD_CHART_GUIDE_";
+string EAGOLD_CHART_GUIDE_FONT="Segoe UI Semibold";
+int EAGOLD_CHART_GUIDE_FONT_SIZE=8;
 
 string EAGOLD_ChartGuidePrice(double price)
 {
@@ -83,25 +87,49 @@ double EAGOLD_ChartGuideNextTake(int direction)
    return(NormalizePrice(targetPrice));
 }
 
-void EAGOLD_ChartGuideSet(string id,datetime when,double price,string text,color clr)
+void EAGOLD_ChartGuideLineSet(string id,datetime startTime,datetime endTime,double price,string legend,color clr)
 {
    if(price<=0.0)return;
-   string name=EAGOLD_CHART_GUIDE_PREFIX+id;
-   if(ObjectFind(0,name)<0)
+   string lineName=EAGOLD_CHART_GUIDE_PREFIX+id+"_LINE";
+   string textName=EAGOLD_CHART_GUIDE_PREFIX+id+"_TEXT";
+   if(ObjectFind(0,lineName)<0)
    {
-      if(!ObjectCreate(0,name,OBJ_TEXT,0,when,price))return;
-      ObjectSetString(0,name,OBJPROP_FONT,"Consolas");
-      ObjectSetInteger(0,name,OBJPROP_FONTSIZE,8);
-      ObjectSetInteger(0,name,OBJPROP_ANCHOR,ANCHOR_LEFT);
-      ObjectSetInteger(0,name,OBJPROP_SELECTABLE,false);
-      ObjectSetInteger(0,name,OBJPROP_SELECTED,false);
-      ObjectSetInteger(0,name,OBJPROP_HIDDEN,true);
-      ObjectSetInteger(0,name,OBJPROP_BACK,true);
-      ObjectSetInteger(0,name,OBJPROP_ZORDER,1);
+      if(!ObjectCreate(0,lineName,OBJ_TREND,0,startTime,price,endTime,price))return;
+      ObjectSetInteger(0,lineName,OBJPROP_RAY_RIGHT,true);
+      ObjectSetInteger(0,lineName,OBJPROP_SELECTABLE,false);
+      ObjectSetInteger(0,lineName,OBJPROP_SELECTED,false);
+      ObjectSetInteger(0,lineName,OBJPROP_HIDDEN,true);
+      ObjectSetInteger(0,lineName,OBJPROP_BACK,true);
+      ObjectSetInteger(0,lineName,OBJPROP_WIDTH,1);
+      ObjectSetInteger(0,lineName,OBJPROP_STYLE,STYLE_DOT);
    }
-   ObjectMove(0,name,0,when,price);
-   ObjectSetString(0,name,OBJPROP_TEXT,text);
-   ObjectSetInteger(0,name,OBJPROP_COLOR,clr);
+   ObjectMove(0,lineName,0,startTime,price);
+   ObjectMove(0,lineName,1,endTime,price);
+   ObjectSetInteger(0,lineName,OBJPROP_COLOR,clr);
+
+   if(ObjectFind(0,textName)<0)
+   {
+      if(!ObjectCreate(0,textName,OBJ_TEXT,0,endTime,price))return;
+      ObjectSetString(0,textName,OBJPROP_FONT,EAGOLD_CHART_GUIDE_FONT);
+      ObjectSetInteger(0,textName,OBJPROP_FONTSIZE,EAGOLD_CHART_GUIDE_FONT_SIZE);
+      ObjectSetInteger(0,textName,OBJPROP_ANCHOR,ANCHOR_LEFT);
+      ObjectSetInteger(0,textName,OBJPROP_SELECTABLE,false);
+      ObjectSetInteger(0,textName,OBJPROP_SELECTED,false);
+      ObjectSetInteger(0,textName,OBJPROP_HIDDEN,true);
+      ObjectSetInteger(0,textName,OBJPROP_BACK,false);
+      ObjectSetInteger(0,textName,OBJPROP_ZORDER,2);
+   }
+   ObjectMove(0,textName,0,endTime,price);
+   ObjectSetString(0,textName,OBJPROP_TEXT,legend);
+   ObjectSetInteger(0,textName,OBJPROP_COLOR,clr);
+}
+
+void EAGOLD_ChartGuideDelete(string id)
+{
+   string lineName=EAGOLD_CHART_GUIDE_PREFIX+id+"_LINE";
+   string textName=EAGOLD_CHART_GUIDE_PREFIX+id+"_TEXT";
+   if(ObjectFind(0,lineName)>=0)ObjectDelete(0,lineName);
+   if(ObjectFind(0,textName)>=0)ObjectDelete(0,textName);
 }
 
 void EAGOLD_ChartBasketGuidesUpdate()
@@ -113,8 +141,10 @@ void EAGOLD_ChartBasketGuidesUpdate()
    }
 
    RefreshRates();
-   datetime anchorTime=Time[0]+PeriodSeconds()*ChartBasketGuideOffsetBars;
-   if(PeriodSeconds()<=0)anchorTime=Time[0]+60*ChartBasketGuideOffsetBars;
+   int periodSeconds=PeriodSeconds();
+   if(periodSeconds<=0)periodSeconds=60;
+   datetime lineStart=Time[0];
+   datetime labelTime=Time[0]+periodSeconds*ChartBasketGuideOffsetBars;
 
    double buyBE=EAGOLD_ModPanelWeightedBE(OP_BUY);
    double sellBE=EAGOLD_ModPanelWeightedBE(OP_SELL);
@@ -125,34 +155,34 @@ void EAGOLD_ChartBasketGuidesUpdate()
    double sellTake=EAGOLD_ChartGuideNextTake(OP_SELL);
 
    if(buyBE>0.0)
-      EAGOLD_ChartGuideSet("BUY_AVG",anchorTime,buyBE,"BUY AVG  "+EAGOLD_ChartGuidePrice(buyBE),clrSilver);
+      EAGOLD_ChartGuideLineSet("BUY_AVG",lineStart,labelTime,buyBE,"BUY AVG "+EAGOLD_ChartGuidePrice(buyBE),clrSilver);
    else
-      ObjectDelete(0,EAGOLD_CHART_GUIDE_PREFIX+"BUY_AVG");
+      EAGOLD_ChartGuideDelete("BUY_AVG");
 
    if(buyPending>0)
-      EAGOLD_ChartGuideSet("BUY_NEXT",anchorTime,buyNext,"BUY NEXT "+EAGOLD_ChartGuidePrice(buyNext),clrDimGray);
+      EAGOLD_ChartGuideLineSet("BUY_NEXT",lineStart,labelTime,buyNext,"BUY NEXT "+EAGOLD_ChartGuidePrice(buyNext),clrDimGray);
    else
-      ObjectDelete(0,EAGOLD_CHART_GUIDE_PREFIX+"BUY_NEXT");
+      EAGOLD_ChartGuideDelete("BUY_NEXT");
 
    if(buyTake>0.0)
-      EAGOLD_ChartGuideSet("BUY_TAKE",anchorTime,buyTake,"BUY TAKE "+EAGOLD_ChartGuidePrice(buyTake),clrAqua);
+      EAGOLD_ChartGuideLineSet("BUY_TAKE",lineStart,labelTime,buyTake,"BUY TAKE "+EAGOLD_ChartGuidePrice(buyTake),clrAqua);
    else
-      ObjectDelete(0,EAGOLD_CHART_GUIDE_PREFIX+"BUY_TAKE");
+      EAGOLD_ChartGuideDelete("BUY_TAKE");
 
    if(sellBE>0.0)
-      EAGOLD_ChartGuideSet("SELL_AVG",anchorTime,sellBE,"SELL AVG "+EAGOLD_ChartGuidePrice(sellBE),clrSilver);
+      EAGOLD_ChartGuideLineSet("SELL_AVG",lineStart,labelTime,sellBE,"SELL AVG "+EAGOLD_ChartGuidePrice(sellBE),clrSilver);
    else
-      ObjectDelete(0,EAGOLD_CHART_GUIDE_PREFIX+"SELL_AVG");
+      EAGOLD_ChartGuideDelete("SELL_AVG");
 
    if(sellPending>0)
-      EAGOLD_ChartGuideSet("SELL_NEXT",anchorTime,sellNext,"SELL NEXT "+EAGOLD_ChartGuidePrice(sellNext),clrDimGray);
+      EAGOLD_ChartGuideLineSet("SELL_NEXT",lineStart,labelTime,sellNext,"SELL NEXT "+EAGOLD_ChartGuidePrice(sellNext),clrDimGray);
    else
-      ObjectDelete(0,EAGOLD_CHART_GUIDE_PREFIX+"SELL_NEXT");
+      EAGOLD_ChartGuideDelete("SELL_NEXT");
 
    if(sellTake>0.0)
-      EAGOLD_ChartGuideSet("SELL_TAKE",anchorTime,sellTake,"SELL TAKE "+EAGOLD_ChartGuidePrice(sellTake),clrAqua);
+      EAGOLD_ChartGuideLineSet("SELL_TAKE",lineStart,labelTime,sellTake,"SELL TAKE "+EAGOLD_ChartGuidePrice(sellTake),clrAqua);
    else
-      ObjectDelete(0,EAGOLD_CHART_GUIDE_PREFIX+"SELL_TAKE");
+      EAGOLD_ChartGuideDelete("SELL_TAKE");
 
    ChartRedraw(0);
 }
@@ -160,11 +190,7 @@ void EAGOLD_ChartBasketGuidesUpdate()
 void EAGOLD_ChartBasketGuidesDelete()
 {
    string ids[]={"BUY_AVG","BUY_NEXT","BUY_TAKE","SELL_AVG","SELL_NEXT","SELL_TAKE"};
-   for(int i=0;i<ArraySize(ids);i++)
-   {
-      string name=EAGOLD_CHART_GUIDE_PREFIX+ids[i];
-      if(ObjectFind(0,name)>=0)ObjectDelete(0,name);
-   }
+   for(int i=0;i<ArraySize(ids);i++)EAGOLD_ChartGuideDelete(ids[i]);
 }
 
 #endif
