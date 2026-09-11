@@ -19,6 +19,11 @@ string EAGOLD_ModPanelBRXMode()
    return("HYBRID");
 }
 
+string EAGOLD_ModPanelR13Regime()
+{
+   return(R13RegimeName(g_r13Observer.regime));
+}
+
 void EAGOLD_ModPanelLabel(string id,string text,int row,color clr)
 {
    string name=EAGOLD_MOD_PANEL_PREFIX+id;
@@ -75,50 +80,6 @@ void EAGOLD_ModPanelBackground(bool visible,int height)
    ObjectSetInteger(0,name,OBJPROP_YSIZE,height);
 }
 
-double EAGOLD_ModPanelWeightedBE(int direction)
-{
-   double lots=0.0,weighted=0.0;
-   for(int i=OrdersTotal()-1;i>=0;i--)
-   {
-      if(!OrderSelect(i,SELECT_BY_POS,MODE_TRADES))continue;
-      if(!IsEAGOLDOrder())continue;
-      if(OrderType()!=direction)continue;
-      lots+=OrderLots();
-      weighted+=OrderOpenPrice()*OrderLots();
-   }
-   if(lots<=0.0)return(0.0);
-   return(NormalizePrice(weighted/lots));
-}
-
-double EAGOLD_ModPanelNextOrderPrice(int direction)
-{
-   int pendingType=(direction==OP_BUY?OP_BUYSTOP:OP_SELLSTOP);
-   double selected=0.0;
-   for(int i=OrdersTotal()-1;i>=0;i--)
-   {
-      if(!OrderSelect(i,SELECT_BY_POS,MODE_TRADES))continue;
-      if(!IsEAGOLDOrder()||OrderType()!=pendingType)continue;
-      double price=OrderOpenPrice();
-      if(selected<=0.0)selected=price;
-      else if(direction==OP_BUY && price<selected)selected=price;
-      else if(direction==OP_SELL && price>selected)selected=price;
-   }
-   return(selected>0.0?NormalizePrice(selected):0.0);
-}
-
-double EAGOLD_ModPanelNextTakePrice(int direction,double basketLots,double basketBE)
-{
-   if(basketLots<=0.0||basketBE<=0.0)return(0.0);
-   double targetMoney=(EnableBasketRealization&&BRXRealizationMode!=0)?BRXDirectionalMinProfit:TakeProfit;
-   if(targetMoney<=0.0)return(0.0);
-   double tickValue=MarketInfo(Symbol(),MODE_TICKVALUE);
-   double tickSize=MarketInfo(Symbol(),MODE_TICKSIZE);
-   if(tickValue<=0.0||tickSize<=0.0)return(0.0);
-   double priceDistance=(targetMoney/(basketLots*tickValue))*tickSize;
-   if(direction==OP_BUY)return(NormalizePrice(basketBE+priceDistance));
-   return(NormalizePrice(basketBE-priceDistance));
-}
-
 void EAGOLD_ModPanelUpdate()
 {
    if(!EnableModularizationPanel)
@@ -168,12 +129,6 @@ void EAGOLD_ModPanelUpdate()
    int displayLevel=RecoveryLevel(displayDirection);
    double recoveryDebt=R10RecoveryDebt();
    double recoveryRemaining=R10RecoveryRemainingDebt();
-   double buyBE=EAGOLD_ModPanelWeightedBE(OP_BUY);
-   double sellBE=EAGOLD_ModPanelWeightedBE(OP_SELL);
-   double buyNext=EAGOLD_ModPanelNextOrderPrice(OP_BUY);
-   double sellNext=EAGOLD_ModPanelNextOrderPrice(OP_SELL);
-   double buyTake=EAGOLD_ModPanelNextTakePrice(OP_BUY,buyLots,buyBE);
-   double sellTake=EAGOLD_ModPanelNextTakePrice(OP_SELL,sellLots,sellBE);
 
    if(!g_modPanelInitialized)
    {
@@ -216,9 +171,14 @@ void EAGOLD_ModPanelUpdate()
    EAGOLD_ModPanelLabel("DD",StringFormat("DD %11s  %6.2f%%",EAGOLD_ModPanelMoney(currentDD),ddPct),row++,currentDD>0.0?clrYellow:clrLime);
 
    EAGOLD_ModPanelLabel("SEP4","----------------------------------------------",row++,clrDimGray);
-   EAGOLD_ModPanelLabel("BE",StringFormat("AVG BUY  %10s   AVG SELL %10s",buyBE>0.0?DoubleToString(buyBE,Digits):"-",sellBE>0.0?DoubleToString(sellBE,Digits):"-"),row++,clrSilver);
-   EAGOLD_ModPanelLabel("NEXT",StringFormat("NEXT BUY %10s   TAKE BUY %10s",buyNext>0.0?DoubleToString(buyNext,Digits):"-",buyTake>0.0?DoubleToString(buyTake,Digits):"-"),row++,clrSilver);
-   EAGOLD_ModPanelLabel("NEXTS",StringFormat("NEXT SELL %10s   TAKE SELL %10s",sellNext>0.0?DoubleToString(sellNext,Digits):"-",sellTake>0.0?DoubleToString(sellTake,Digits):"-"),row++,clrSilver);
+   // AVG/NEXT/TAKE remain available on the chart guides; panel space is
+   // dedicated to R13 observer telemetry instead.
+   bool r13Enabled=(EnableR13 && g_r13Observer.configValid);
+   bool r13Eligible=g_r13Observer.eligible;
+   color r13StateColor=r13Eligible?clrLime:(r13Enabled?clrAqua:clrSilver);
+   EAGOLD_ModPanelLabel("R13A",StringFormat("R13 %-3s   REG %-9s   ELIG %-3s",r13Enabled?"ON":"OFF",EAGOLD_ModPanelR13Regime(),r13Eligible?"YES":"NO"),row++,r13StateColor);
+   EAGOLD_ModPanelLabel("R13B",StringFormat("R13 ATR %7.1f   RNG %7.1f   DRIFT %7.1f",g_r13Observer.atrPoints,g_r13Observer.rangePoints,g_r13Observer.driftPoints),row++,clrAqua);
+   EAGOLD_ModPanelLabel("R13C",StringFormat("R13 MEXP %5.2f   POS %2d   P/L %9s",g_r13Observer.masterExposureLots,g_r13Observer.satellitePositions,EAGOLD_ModPanelMoney(g_r13Observer.satelliteProfit)),row++,clrSilver);
    EAGOLD_ModPanelLabel("HEDGE",StringFormat("HEDGE     %s",g_r9HedgeActive?"ATIVO":"INATIVO"),row++,g_r9HedgeActive?clrYellow:clrSilver);
    EAGOLD_ModPanelLabel("R11",StringFormat("R11 STEP x %4.2f   L%-2d = %s",EnableRecoveryStepMultiplier?RecoveryStepMultiplier:1.00,displayLevel,EAGOLD_ModPanelLots(RecoveryStepForLevel(displayLevel))),row++,EnableRecoveryStepMultiplier?clrAqua:clrSilver);
    EAGOLD_ModPanelLabel("REC",StringFormat("RECOVERY  B%-2d S%-2d L%-2d",RecoveryLevel(OP_BUY),RecoveryLevel(OP_SELL),recoveryLevel),row++,recoveryRemaining>0.0?clrYellow:clrLime);
@@ -247,7 +207,7 @@ void EAGOLD_ModPanelUpdate()
 
 void EAGOLD_ModPanelDelete()
 {
-   string ids[]={"BG","TITLE","SEP1","IDENT","MARKET","SPREAD","SEP2","BUY","SELL","EXPOS","PENDING","SEP3","TOTAL","EQUITY","ACCUM","MIN","LOTS","MAXLOTS","DD","SEP4","BE","NEXT","NEXTS","HEDGE","R11","REC","RECD","SEP5","BRX","TRAIL","TIME","SEP6","DBG1","DBG2","DBG3","DBG4","DBG5","DBG6","DBG7","DBG8"};
+   string ids[]={"BG","TITLE","SEP1","IDENT","MARKET","SPREAD","SEP2","BUY","SELL","EXPOS","PENDING","SEP3","TOTAL","EQUITY","ACCUM","MIN","LOTS","MAXLOTS","DD","SEP4","R13A","R13B","R13C","HEDGE","R11","REC","RECD","SEP5","BRX","TRAIL","TIME","SEP6","DBG1","DBG2","DBG3","DBG4","DBG5","DBG6","DBG7","DBG8"};
    for(int i=0;i<ArraySize(ids);i++)
    {
       string name=EAGOLD_MOD_PANEL_PREFIX+ids[i];
