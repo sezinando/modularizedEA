@@ -20,41 +20,7 @@ R13ObserverState g_r13Observer;
 double EngineMarkerPipsToPrice(double pips){double pipSize=Point;if(Digits==3||Digits==5)pipSize=Point*10.0;return(pips*pipSize);}
 int EngineMarkerStackLevel(string engine){if(engine=="R1")return(0);if(engine=="R1.1")return(1);if(engine=="R4")return(2);if(engine=="R5"||engine=="BRX")return(3);if(engine=="R7")return(4);if(engine=="R10")return(5);if(engine=="R13")return(6);return(7);}
 string ResolveEngineMarkerFont(){return("Arial");}
-
-void CreateEngineActionMarker(string engine,string action,int direction,double lots)
-{
-   if(!EnableEngineActionMarkers||Bars<1)return;
-   RefreshRates();datetime stamp=Time[0];double price=NormalizePrice(direction==OP_BUY?Low[0]:High[0]);color markerColor=CascadeEngineColor(engine);string name=ENGINE_MARKER_PREFIX+IntegerToString((int)stamp)+"_"+IntegerToString(GetTickCount())+"_"+IntegerToString(MathRand());
-   if(ObjectCreate(0,name,OBJ_ARROW,0,stamp,price)){ObjectSetInteger(0,name,OBJPROP_ARROWCODE,159);ObjectSetInteger(0,name,OBJPROP_WIDTH,2);ObjectSetInteger(0,name,OBJPROP_COLOR,markerColor);ObjectSetInteger(0,name,OBJPROP_SELECTABLE,false);ObjectSetInteger(0,name,OBJPROP_SELECTED,false);ObjectSetInteger(0,name,OBJPROP_HIDDEN,true);ObjectSetInteger(0,name,OBJPROP_BACK,false);ObjectSetInteger(0,name,OBJPROP_ZORDER,5);}
-   EAGOLD_ActionCascadeAdd(engine);ChartRedraw(0);
-}
-
-int OnInit()
-{
-   ObjectsDeleteAll(0,ENGINE_MARKER_PREFIX);ObjectsDeleteAll(0,R10_MARKER_PREFIX);ArrayResize(g_r9ProcessedTickets,0);g_r9HedgeActive=false;g_r10LastAction=0;
-   g_r10RecoveryCycleActive=false;g_r10RecoveryStartEquity=0.0;g_r10RecoveryWorstEquity=0.0;
-   if(EAGOLD_PersistenceEnabled())
-      LoadPersistedStrategicState();
-   else
-   {
-      // Strategy Tester must start every run with clean in-memory state.
-      // Do not read terminal Global Variables left by previous live/test runs.
-      g_modPanelMinProfit=0.0;
-      g_modPanelMaxLots=0.0;
-      g_modPanelInitialized=true;
-      g_panelMinProfit=0.0;
-      g_panelMaxLots=0.0;
-      g_panelInitialized=true;
-   }
-   g_r1LastDecision="DISABLED";g_r1LastReason="";g_r1LastDecisionTime=0;R13ResetObserverState(g_r13Observer);R9SeedExistingPositions();R13Observe(g_r13Observer);EAGOLD_ModPanelUpdate();EAGOLD_RealizationCascadeUpdate();EAGOLD_ChartBasketGuidesUpdate();PersistAllState(true);CreateFirstOrdersIfFlat();R13Observe(g_r13Observer);EAGOLD_ModPanelUpdate();EAGOLD_RealizationCascadeUpdate();EAGOLD_ChartBasketGuidesUpdate();PersistAllState(true);return(INIT_SUCCEEDED);
-}
-
-void OnDeinit(const int reason)
-{
-   if(EAGOLD_PersistenceEnabled())PersistAllState(true);EAGOLD_RealizationCascadeDelete();EAGOLD_ChartBasketGuidesDelete();EAGOLD_ModPanelDelete();
-}
-
-void OnTick()
-{
-   R10RecoveryUpdateState();Rule9DetectActivatedOrders();BuyMachine();SellMachine();CreateFirstOrdersIfFlat();TrailAllStopOrders();R13Observe(g_r13Observer);ObjectsDeleteAll(0,R10_MARKER_PREFIX);EAGOLD_ModPanelUpdate();EAGOLD_RealizationCascadeUpdate();EAGOLD_ChartBasketGuidesUpdate();PersistAllState(false);
-}
+void CreateEngineActionMarker(string engine,string action,int direction,double lots){if(!EnableEngineActionMarkers||Bars<1)return;RefreshRates();datetime stamp=Time[0];double price=NormalizePrice(direction==OP_BUY?Low[0]:High[0]);color markerColor=CascadeEngineColor(engine);string name=ENGINE_MARKER_PREFIX+IntegerToString((int)stamp)+"_"+IntegerToString(GetTickCount())+"_"+IntegerToString(MathRand());if(ObjectCreate(0,name,OBJ_ARROW,0,stamp,price)){ObjectSetInteger(0,name,OBJPROP_ARROWCODE,159);ObjectSetInteger(0,name,OBJPROP_WIDTH,2);ObjectSetInteger(0,name,OBJPROP_COLOR,markerColor);ObjectSetInteger(0,name,OBJPROP_SELECTABLE,false);ObjectSetInteger(0,name,OBJPROP_SELECTED,false);ObjectSetInteger(0,name,OBJPROP_HIDDEN,true);ObjectSetInteger(0,name,OBJPROP_BACK,false);ObjectSetInteger(0,name,OBJPROP_ZORDER,5);}EAGOLD_ActionCascadeAdd(engine);ChartRedraw(0);}
+int OnInit(){ObjectsDeleteAll(0,ENGINE_MARKER_PREFIX);ObjectsDeleteAll(0,R10_MARKER_PREFIX);ArrayResize(g_r9ProcessedTickets,0);g_r9HedgeActive=false;g_r10LastAction=0;g_r10RecoveryCycleActive=false;g_r10RecoveryStartEquity=0.0;g_r10RecoveryWorstEquity=0.0;if(EAGOLD_PersistenceEnabled())LoadPersistedStrategicState();else{g_modPanelMinProfit=0.0;g_modPanelMaxLots=0.0;g_modPanelInitialized=true;g_panelMinProfit=0.0;g_panelMaxLots=0.0;g_panelInitialized=true;}g_r1LastDecision="DISABLED";g_r1LastReason="";g_r1LastDecisionTime=0;R13ResetObserverState(g_r13Observer);R9SeedExistingPositions();R13Observe(g_r13Observer);EAGOLD_ModPanelUpdate();EAGOLD_RealizationCascadeUpdate();EAGOLD_ChartBasketGuidesUpdate();PersistAllState(true);CreateFirstOrdersIfFlat();R13Observe(g_r13Observer);EAGOLD_ModPanelUpdate();EAGOLD_RealizationCascadeUpdate();EAGOLD_ChartBasketGuidesUpdate();PersistAllState(true);return(INIT_SUCCEEDED);}
+void OnDeinit(const int reason){if(EAGOLD_PersistenceEnabled())PersistAllState(true);EAGOLD_RealizationCascadeDelete();EAGOLD_ChartBasketGuidesDelete();EAGOLD_ModPanelDelete();}
+void OnTick(){R10RecoveryUpdateState();Rule9DetectActivatedOrders();BuyMachine();SellMachine();CreateFirstOrdersIfFlat();TrailAllStopOrders();R13Observe(g_r13Observer);ObjectsDeleteAll(0,R10_MARKER_PREFIX);EAGOLD_ModPanelUpdate();EAGOLD_RealizationCascadeUpdate();EAGOLD_ChartBasketGuidesUpdate();PersistAllState(false);}
