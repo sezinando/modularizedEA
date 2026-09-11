@@ -40,28 +40,59 @@ double NormalizeLot(double lot){if(lot<Lot)lot=Lot;if(MaxOpenLot>0.0&&lot>MaxOpe
 
 R13ObserverState g_r13Observer;
 
+// Converts a visual pip offset to symbol price. For 3/5-digit symbols one
+// pip is 10 points; for 2/4-digit symbols (including the current XAUUSD
+// tester convention) one pip equals one point.
+double EngineMarkerPipsToPrice(double pips)
+{
+   double pipSize=Point;
+   if(Digits==3 || Digits==5)
+      pipSize=Point*10.0;
+   return(pips*pipSize);
+}
+
+// Resolve the requested display font while keeping the visual contract
+// portable across MT4 terminals. Impact is preferred, followed by the
+// supplied alternatives. TextSetFont() returns false when a font is absent.
+string ResolveEngineMarkerFont()
+{
+   string fonts[3];
+   fonts[0]=EngineActionMarkerFont;
+   fonts[1]="Arial Black";
+   fonts[2]="Trebuchet MS";
+
+   for(int i=0;i<3;i++)
+   {
+      if(fonts[i]=="")continue;
+      if(TextSetFont(fonts[i],EngineActionMarkerFontSize,FW_BLACK))
+         return(fonts[i]);
+   }
+
+   return("Arial");
+}
+
 void CreateEngineActionMarker(string engine,string action,int direction,double lots)
 {
    if(!EnableEngineActionMarkers)return;
+   if(Bars<1)return;
    RefreshRates();
 
-   double mid=NormalizePrice((Bid+Ask)/2.0);
-   double offset=PointsToPrice(EngineActionMarkerOffsetPoints);
-   double price=(direction==OP_SELL?mid+offset:mid-offset);
-   datetime stamp=TimeCurrent();
-
+   datetime stamp=Time[0];
+   double price=NormalizePrice(High[0]+EngineMarkerPipsToPrice(EngineActionMarkerOffsetPips));
    string text=engine+" "+action;
    if(lots>=Lot)text+=" "+DoubleToString(lots,DigitsLots);
 
-   color c=clrSilver;
-   if(engine=="R9")c=clrYellow;
-   else if(engine=="R10")c=(direction==OP_BUY?clrLime:clrTomato);
-   else if(engine=="R10.2")c=clrAqua;
-   else if(engine=="R5")c=clrWhite;
-   else if(engine=="R4")c=clrSilver;
-   else if(engine=="R7")c=clrSilver;
-   else if(engine=="R1")c=clrWhite;
-   else if(engine=="R11")c=clrAqua;
+   string fontName=ResolveEngineMarkerFont();
+   uint textWidth=0;
+   uint textHeight=0;
+   if(!TextGetSize(text,textWidth,textHeight))
+   {
+      textWidth=(uint)(StringLen(text)*8+10);
+      textHeight=(uint)(EngineActionMarkerFontSize+7);
+   }
+
+   int boxWidth=(int)textWidth+10;
+   int boxHeight=(int)textHeight+4;
 
    string baseName=ENGINE_MARKER_PREFIX+IntegerToString((int)stamp)+"_"+IntegerToString(GetTickCount())+"_"+IntegerToString(MathRand());
    string textName=baseName+"_TXT";
@@ -74,12 +105,8 @@ void CreateEngineActionMarker(string engine,string action,int direction,double l
       return;
    }
 
-   // Same visual construction pattern used by the validated chart UI:
-   // pixel-sized rectangle first, then OBJ_TEXT over it.
-   // Tahoma 9 gives stable readability in the MT4 Strategy Tester.
-   int textWidth=StringLen(text)*7+10;
-   int textHeight=15;
-
+   // Pixel-sized opaque background, matching the supplied validated UI
+   // pattern: flat rectangle first, then text in the foreground.
    if(ObjectCreate(0,bgName,OBJ_RECTANGLE_LABEL,0,0,0))
    {
       ObjectSetInteger(0,bgName,OBJPROP_CORNER,CORNER_LEFT_UPPER);
@@ -87,18 +114,18 @@ void CreateEngineActionMarker(string engine,string action,int direction,double l
       ObjectSetInteger(0,bgName,OBJPROP_SELECTABLE,false);
       ObjectSetInteger(0,bgName,OBJPROP_SELECTED,false);
       ObjectSetInteger(0,bgName,OBJPROP_HIDDEN,true);
-      ObjectSetInteger(0,bgName,OBJPROP_XDISTANCE,x-(textWidth/2));
-      ObjectSetInteger(0,bgName,OBJPROP_YDISTANCE,y-textHeight);
-      ObjectSetInteger(0,bgName,OBJPROP_XSIZE,textWidth);
-      ObjectSetInteger(0,bgName,OBJPROP_YSIZE,textHeight);
-      ObjectSetInteger(0,bgName,OBJPROP_BGCOLOR,clrBlack);
-      ObjectSetInteger(0,bgName,OBJPROP_COLOR,clrBlack);
+      ObjectSetInteger(0,bgName,OBJPROP_XDISTANCE,x-(boxWidth/2));
+      ObjectSetInteger(0,bgName,OBJPROP_YDISTANCE,y-boxHeight);
+      ObjectSetInteger(0,bgName,OBJPROP_XSIZE,boxWidth);
+      ObjectSetInteger(0,bgName,OBJPROP_YSIZE,boxHeight);
+      ObjectSetInteger(0,bgName,OBJPROP_BGCOLOR,EngineActionMarkerBackgroundColor);
+      ObjectSetInteger(0,bgName,OBJPROP_COLOR,EngineActionMarkerBackgroundColor);
       ObjectSetInteger(0,bgName,OBJPROP_BACK,false);
       ObjectSetInteger(0,bgName,OBJPROP_ZORDER,1);
    }
 
-   // Create/update the text after the background so the text remains in the
-   // foreground and follows the same anchor convention as the source pattern.
+   // Text is anchored by its lower edge at the same chart coordinate as the
+   // label, so the black box remains immediately behind the glyphs.
    if(ObjectCreate(0,textName,OBJ_TEXT,0,stamp,price))
    {
       ObjectSetInteger(0,textName,OBJPROP_ANCHOR,ANCHOR_LOWER);
@@ -106,9 +133,9 @@ void CreateEngineActionMarker(string engine,string action,int direction,double l
       ObjectSetInteger(0,textName,OBJPROP_SELECTED,false);
       ObjectSetInteger(0,textName,OBJPROP_HIDDEN,true);
       ObjectSetString(0,textName,OBJPROP_TEXT,text);
-      ObjectSetString(0,textName,OBJPROP_FONT,"Tahoma");
-      ObjectSetInteger(0,textName,OBJPROP_FONTSIZE,9);
-      ObjectSetInteger(0,textName,OBJPROP_COLOR,c);
+      ObjectSetString(0,textName,OBJPROP_FONT,fontName);
+      ObjectSetInteger(0,textName,OBJPROP_FONTSIZE,EngineActionMarkerFontSize);
+      ObjectSetInteger(0,textName,OBJPROP_COLOR,EngineActionMarkerTextColor);
       ObjectSetInteger(0,textName,OBJPROP_BACK,false);
       ObjectSetInteger(0,textName,OBJPROP_ZORDER,2);
    }
