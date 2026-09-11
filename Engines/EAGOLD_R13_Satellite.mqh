@@ -12,6 +12,7 @@
 //
 // This stage intentionally does NOT attempt the later range-entry,
 // persistence, capital-reserve or advanced recovery policies.
+// The regime classifier remains telemetry only in this stage.
 //==================================================================
 
 #define R13_REGIME_OFF       0
@@ -259,6 +260,7 @@ bool R13CloseAll(string reason,double &realizedTotal){
       if(R13CloseTicket(ticket,realized)){realizedTotal+=realized;changed=true;}
    }
    if(changed)Print(EA_NAME," R13 EXIT: reason=",reason," realized=$",DoubleToString(realizedTotal,2));
+   if(changed)g_r13LastEntry=TimeCurrent();
    return(changed);
 }
 
@@ -317,7 +319,8 @@ void R13ManageOpenPositions(int masterDirection,double masterExposure){
 void R13TryOpen(int masterDirection,double masterExposure,int regime){
    if(!EnableR13Trading)return;
    if(masterDirection<0||masterExposure<R13MinDirectionalImbalance)return;
-   if(regime!=R13_REGIME_RANGE)return;
+   // Initial parallel mode is intentionally regime-independent. R12/range
+   // filters remain telemetry and will be promoted to an entry gate later.
    if(R13CountOwnPositions()>0)return;
    if(R13EntryCooldownSeconds>0.0&&g_r13LastEntry>0&&TimeCurrent()-g_r13LastEntry<R13EntryCooldownSeconds)return;
 
@@ -357,15 +360,14 @@ void R13Observe(R13ObserverState &state){
    state.relativeVolatility=(state.atrPoints>0.0?state.rangePoints/state.atrPoints:0.0);
    state.regime=R13ClassifyRegime(state.atrPoints,state.rangePoints,state.driftPoints);
 
-   state.eligible=(state.regime==R13_REGIME_RANGE &&
-                   state.masterExposureLots>=R13MinDirectionalImbalance &&
+   state.eligible=(state.masterExposureLots>=R13MinDirectionalImbalance &&
+                   state.configValid &&
                    state.satellitePositions<R13MaxPositions);
-   state.reason=state.eligible?"ELIGIBLE_RANGE":"REGIME_OR_MASTER_GATE";
+   state.reason=state.eligible?"ELIGIBLE_MASTER_EXPOSURE":"MASTER_OR_LIMIT_GATE";
 
    if(state.tradingEnabled){
       R13ManageOpenPositions(state.masterDirection,state.masterExposureLots);
       R13TryOpen(state.masterDirection,state.masterExposureLots,state.regime);
-      // Refresh the observer values after any R13 action.
       state.masterExposureLots=ExposureLots();
       state.masterDirection=HeavyDirection();
       state.satelliteDirection=R13OwnDirection();
