@@ -44,18 +44,18 @@ void EAGOLD_RealizationCascadeUpdate()
    if(!EnableModularizationPanel){EAGOLD_RealizationCascadeDelete();return;}
    if(g_realizationCascadeCount<1&&g_actionCascadeCount<1)return;
 
-   int rowHeight=16,headerHeight=20,gap=8,right=8;
+   int rowHeight=16,headerHeight=20,gap=8;
+   // Safe right margin keeps the realization column inside the drawable chart
+   // area and away from the broker price scale.
+   int right=68;
    int actionWidth=118,realWidth=78;
    int panelHeight=headerHeight+EAGOLD_REALIZATION_CASCADE_MAX*rowHeight+8;
    int panelY=8;
 
    // Two independent FIFO panels, side-by-side, anchored to the upper-right.
-   // Keep the cascades above the operational panel even when the chart is
-   // narrow enough for the panel background to overlap their X range.
    int realRight=right;
    int actionRight=right+realWidth+gap;
 
-   // ACTIONS
    string actionBg=g_actionCascadePrefix+"BG";
    if(ObjectFind(0,actionBg)<0)ObjectCreate(0,actionBg,OBJ_RECTANGLE_LABEL,0,0,0);
    ObjectSetInteger(0,actionBg,OBJPROP_CORNER,CORNER_RIGHT_UPPER);ObjectSetInteger(0,actionBg,OBJPROP_ANCHOR,ANCHOR_RIGHT_UPPER);ObjectSetInteger(0,actionBg,OBJPROP_BORDER_TYPE,BORDER_FLAT);ObjectSetInteger(0,actionBg,OBJPROP_SELECTABLE,false);ObjectSetInteger(0,actionBg,OBJPROP_HIDDEN,true);ObjectSetInteger(0,actionBg,OBJPROP_BACK,false);ObjectSetInteger(0,actionBg,OBJPROP_BGCOLOR,clrBlack);ObjectSetInteger(0,actionBg,OBJPROP_COLOR,clrBlack);ObjectSetInteger(0,actionBg,OBJPROP_XDISTANCE,actionRight);ObjectSetInteger(0,actionBg,OBJPROP_YDISTANCE,panelY);ObjectSetInteger(0,actionBg,OBJPROP_XSIZE,actionWidth);ObjectSetInteger(0,actionBg,OBJPROP_YSIZE,panelHeight);ObjectSetInteger(0,actionBg,OBJPROP_ZORDER,1100);
@@ -66,7 +66,6 @@ void EAGOLD_RealizationCascadeUpdate()
 
    for(int a=0;a<EAGOLD_REALIZATION_CASCADE_MAX;a++){string an=g_actionCascadePrefix+IntegerToString(a);if(a<g_actionCascadeCount){if(ObjectFind(0,an)<0)ObjectCreate(0,an,OBJ_LABEL,0,0,0);int ay=panelY+headerHeight+a*rowHeight;ObjectSetInteger(0,an,OBJPROP_CORNER,CORNER_RIGHT_UPPER);ObjectSetInteger(0,an,OBJPROP_ANCHOR,ANCHOR_RIGHT_UPPER);ObjectSetInteger(0,an,OBJPROP_XDISTANCE,actionRight+7);ObjectSetInteger(0,an,OBJPROP_YDISTANCE,ay);ObjectSetInteger(0,an,OBJPROP_SELECTABLE,false);ObjectSetInteger(0,an,OBJPROP_HIDDEN,true);ObjectSetInteger(0,an,OBJPROP_FONTSIZE,8);ObjectSetString(0,an,OBJPROP_FONT,"Arial");ObjectSetInteger(0,an,OBJPROP_COLOR,g_actionCascadeColors[a]);ObjectSetInteger(0,an,OBJPROP_ZORDER,1101);ObjectSetString(0,an,OBJPROP_TEXT,TimeToString(g_actionCascadeTime[a],TIME_SECONDS)+"  "+g_actionCascadeEngine[a]);}else ObjectDelete(0,an);}
 
-   // REALIZATIONS — values only; colored dot identifies the originating engine.
    string realBg=g_realizationCascadePrefix+"BG";
    if(ObjectFind(0,realBg)<0)ObjectCreate(0,realBg,OBJ_RECTANGLE_LABEL,0,0,0);
    ObjectSetInteger(0,realBg,OBJPROP_CORNER,CORNER_RIGHT_UPPER);ObjectSetInteger(0,realBg,OBJPROP_ANCHOR,ANCHOR_RIGHT_UPPER);ObjectSetInteger(0,realBg,OBJPROP_BORDER_TYPE,BORDER_FLAT);ObjectSetInteger(0,realBg,OBJPROP_SELECTABLE,false);ObjectSetInteger(0,realBg,OBJPROP_HIDDEN,true);ObjectSetInteger(0,realBg,OBJPROP_BACK,false);ObjectSetInteger(0,realBg,OBJPROP_BGCOLOR,clrBlack);ObjectSetInteger(0,realBg,OBJPROP_COLOR,clrBlack);ObjectSetInteger(0,realBg,OBJPROP_XDISTANCE,realRight);ObjectSetInteger(0,realBg,OBJPROP_YDISTANCE,panelY);ObjectSetInteger(0,realBg,OBJPROP_XSIZE,realWidth);ObjectSetInteger(0,realBg,OBJPROP_YSIZE,panelHeight);ObjectSetInteger(0,realBg,OBJPROP_ZORDER,1100);
@@ -75,7 +74,7 @@ void EAGOLD_RealizationCascadeUpdate()
    if(ObjectFind(0,realTitle)<0)ObjectCreate(0,realTitle,OBJ_LABEL,0,0,0);
    ObjectSetInteger(0,realTitle,OBJPROP_CORNER,CORNER_RIGHT_UPPER);ObjectSetInteger(0,realTitle,OBJPROP_ANCHOR,ANCHOR_RIGHT_UPPER);ObjectSetInteger(0,realTitle,OBJPROP_XDISTANCE,realRight+7);ObjectSetInteger(0,realTitle,OBJPROP_YDISTANCE,panelY+8);ObjectSetInteger(0,realTitle,OBJPROP_SELECTABLE,false);ObjectSetInteger(0,realTitle,OBJPROP_HIDDEN,true);ObjectSetString(0,realTitle,OBJPROP_FONT,"Arial Bold");ObjectSetInteger(0,realTitle,OBJPROP_FONTSIZE,9);ObjectSetInteger(0,realTitle,OBJPROP_COLOR,clrWhite);ObjectSetInteger(0,realTitle,OBJPROP_ZORDER,1101);ObjectSetString(0,realTitle,OBJPROP_TEXT,"REALIZACOES (FIFO - 30)");
 
-   for(int r=0;r<EAGOLD_REALIZATION_CASCADE_MAX;r++){string vn=g_realizationCascadePrefix+"V_"+IntegerToString(r),dn=g_realizationCascadePrefix+"D_"+IntegerToString(r);if(r<g_realizationCascadeCount){int ry=panelY+headerHeight+r*rowHeight;if(ObjectFind(0,vn)<0)ObjectCreate(0,vn,OBJ_LABEL,0,0,0);ObjectSetInteger(0,vn,OBJPROP_CORNER,CORNER_RIGHT_UPPER);ObjectSetInteger(0,vn,OBJPROP_ANCHOR,ANCHOR_RIGHT_UPPER);ObjectSetInteger(0,vn,OBJPROP_XDISTANCE,realRight+8);ObjectSetInteger(0,vn,OBJPROP_YDISTANCE,ry);ObjectSetInteger(0,vn,OBJPROP_SELECTABLE,false);ObjectSetInteger(0,vn,OBJPROP_HIDDEN,true);ObjectSetString(0,vn,OBJPROP_FONT,"Impact");ObjectSetInteger(0,vn,OBJPROP_FONTSIZE,9);ObjectSetInteger(0,vn,OBJPROP_COLOR,clrYellow);ObjectSetInteger(0,vn,OBJPROP_ZORDER,1101);ObjectSetString(0,vn,OBJPROP_TEXT,DoubleToString(g_realizationCascadeValues[r],2));if(ObjectFind(0,dn)<0)ObjectCreate(0,dn,OBJ_LABEL,0,0,0);ObjectSetInteger(0,dn,OBJPROP_CORNER,CORNER_RIGHT_UPPER);ObjectSetInteger(0,dn,OBJPROP_ANCHOR,ANCHOR_RIGHT_UPPER);ObjectSetInteger(0,dn,OBJPROP_XDISTANCE,realRight+58);ObjectSetInteger(0,dn,OBJPROP_YDISTANCE,ry-1);ObjectSetInteger(0,dn,OBJPROP_SELECTABLE,false);ObjectSetInteger(0,dn,OBJPROP_HIDDEN,true);ObjectSetString(0,dn,OBJPROP_FONT,"Arial");ObjectSetInteger(0,dn,OBJPROP_FONTSIZE,9);ObjectSetInteger(0,dn,OBJPROP_COLOR,g_realizationCascadeColors[r]);ObjectSetInteger(0,dn,OBJPROP_ZORDER,1102);ObjectSetString(0,dn,OBJPROP_TEXT,"●");}else{ObjectDelete(0,vn);ObjectDelete(0,dn);}}
+   for(int r=0;r<EAGOLD_REALIZATION_CASCADE_MAX;r++){string vn=g_realizationCascadePrefix+"V_"+IntegerToString(r),dn=g_realizationCascadePrefix+"D_"+IntegerToString(r);if(r<g_realizationCascadeCount){int ry=panelY+headerHeight+r*rowHeight;if(ObjectFind(0,vn)<0)ObjectCreate(0,vn,OBJ_LABEL,0,0,0);ObjectSetInteger(0,vn,OBJPROP_CORNER,CORNER_RIGHT_UPPER);ObjectSetInteger(0,vn,OBJPROP_ANCHOR,ANCHOR_RIGHT_UPPER);ObjectSetInteger(0,vn,OBJPROP_XDISTANCE,realRight+8);ObjectSetInteger(0,vn,OBJPROP_YDISTANCE,ry);ObjectSetInteger(0,vn,OBJPROP_SELECTABLE,false);ObjectSetInteger(0,vn,OBJPROP_HIDDEN,true);ObjectSetString(0,vn,OBJPROP_FONT,"Impact");ObjectSetInteger(0,vn,OBJPROP_FONTSIZE,9);ObjectSetInteger(0,vn,OBJPROP_COLOR,g_realizationCascadeColors[r]);ObjectSetInteger(0,vn,OBJPROP_ZORDER,1101);ObjectSetString(0,vn,OBJPROP_TEXT,DoubleToString(g_realizationCascadeValues[r],2));if(ObjectFind(0,dn)<0)ObjectCreate(0,dn,OBJ_LABEL,0,0,0);ObjectSetInteger(0,dn,OBJPROP_CORNER,CORNER_RIGHT_UPPER);ObjectSetInteger(0,dn,OBJPROP_ANCHOR,ANCHOR_RIGHT_UPPER);ObjectSetInteger(0,dn,OBJPROP_XDISTANCE,realRight+58);ObjectSetInteger(0,dn,OBJPROP_YDISTANCE,ry-1);ObjectSetInteger(0,dn,OBJPROP_SELECTABLE,false);ObjectSetInteger(0,dn,OBJPROP_HIDDEN,true);ObjectSetString(0,dn,OBJPROP_FONT,"Arial");ObjectSetInteger(0,dn,OBJPROP_FONTSIZE,9);ObjectSetInteger(0,dn,OBJPROP_COLOR,g_realizationCascadeColors[r]);ObjectSetInteger(0,dn,OBJPROP_ZORDER,1102);ObjectSetString(0,dn,OBJPROP_TEXT,"●");}else{ObjectDelete(0,vn);ObjectDelete(0,dn);}}
    ChartRedraw(0);
 }
 
