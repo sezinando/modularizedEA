@@ -6,14 +6,16 @@
 // - Inputs are NOT persisted. They remain the EA configuration contract.
 // - Only non-reconstructible operational state and historical extrema are kept.
 // - Runtime telemetry is calculated in memory/on demand.
-// - GlobalVariableSet updates terminal-global state in memory.
-// - GlobalVariablesFlush is reserved for forced lifecycle checkpoints.
+// - Live operation may use terminal Global Variables for continuity.
+// - Strategy Tester deliberately does NOT read or write terminal Global Variables.
+// - GlobalVariablesFlush is reserved for forced live lifecycle checkpoints.
 //
-// Rationale: MQL4 documents that the terminal writes global variables when
-// work is over; GlobalVariablesFlush() is intended for independently forcing
-// a disk save, e.g. as a contingency. It must not be used as a per-tick
-// persistence mechanism in a high-frequency EA/tester.
+// Rationale: MQL4 documents that terminal Global Variables are shared with
+// Strategy Tester and can therefore contaminate tests with previous state.
+// Backtests must start from a clean in-memory state for every run.
 //==================================================================
+
+bool EAGOLD_PersistenceEnabled(){return(!IsTesting());}
 
 string StateKey(string metric){return(STATE_PREFIX+Symbol()+"_"+IntegerToString(MagicNumber)+"_"+metric);}
 
@@ -22,6 +24,9 @@ double PersistMonotonicMax(string key,double currentValue){if(!GlobalVariableChe
 
 void PersistPanelExtrema(double currentProfit,double currentLots)
 {
+   // In Strategy Tester, panel extrema belong to the current test run only.
+   if(!EAGOLD_PersistenceEnabled())return;
+
    string minKey=StateKey("PANEL_MIN_PROFIT");
    string maxKey=StateKey("MAX_ACCUM_LOTS");
    double persistedMin=PersistMonotonicMin(minKey,currentProfit);
@@ -32,11 +37,13 @@ void PersistPanelExtrema(double currentProfit,double currentLots)
       GlobalVariableSet(maxKey,persistedMax);
    // Deliberately no GlobalVariablesFlush() here. The terminal manages the
    // persistence of terminal-global variables; explicit disk flush is reserved
-   // for forced lifecycle checkpoints.
+   // for forced live lifecycle checkpoints.
 }
 
 void LoadPersistedStrategicState()
 {
+   if(!EAGOLD_PersistenceEnabled())return;
+
    if(GlobalVariableCheck(StateKey("g_r10RecoveryCycleActive")))g_r10RecoveryCycleActive=(GlobalVariableGet(StateKey("g_r10RecoveryCycleActive"))>0.5);
    if(GlobalVariableCheck(StateKey("g_r10RecoveryStartEquity")))g_r10RecoveryStartEquity=GlobalVariableGet(StateKey("g_r10RecoveryStartEquity"));
    if(GlobalVariableCheck(StateKey("g_r10RecoveryWorstEquity")))g_r10RecoveryWorstEquity=GlobalVariableGet(StateKey("g_r10RecoveryWorstEquity"));
@@ -48,6 +55,9 @@ void LoadPersistedStrategicState()
 
 void PersistStrategicState(bool force=false)
 {
+   // Backtests are intentionally stateless with respect to terminal GVs.
+   if(!EAGOLD_PersistenceEnabled())return;
+
    static bool initialized=false;
    static double lastCycle=0.0,lastStart=0.0,lastWorstPersisted=0.0,lastAction=0.0,lastHedge=0.0;
 
@@ -81,8 +91,7 @@ void PersistStrategicState(bool force=false)
    lastAction=(double)g_r10LastAction;
    lastHedge=hedge;
 
-   // Only forced lifecycle checkpoints hit disk synchronously.
-   // Normal checkpoints update terminal-global state without forcing I/O.
+   // Only forced live lifecycle checkpoints hit disk synchronously.
    if(force)GlobalVariablesFlush();
 }
 
