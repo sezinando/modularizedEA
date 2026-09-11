@@ -126,7 +126,10 @@ extern string EngineActionMarkerFont="Impact";
 extern int EngineActionMarkerFontSize=9;
 extern color EngineActionMarkerTextColor=clrYellow;
 extern color EngineActionMarkerBackgroundColor=clrBlack;
-extern double EngineActionMarkerOffsetPips=10.0;
+// Base vertical distance from the current candle high. Engine-specific
+// stacking below separates simultaneous engine labels to reduce overlap.
+extern double EngineActionMarkerOffsetPips=20.0;
+extern double EngineActionMarkerStackStepPips=20.0;
 // Legacy persistence field retained so older persistence code compiles.
 // The visual engine uses EngineActionMarkerOffsetPips.
 double EngineActionMarkerOffsetPoints=100.0;
