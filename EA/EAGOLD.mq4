@@ -22,16 +22,15 @@ int EngineMarkerStackLevel(string engine){if(engine=="R1")return(0);if(engine=="
 string ResolveEngineMarkerFont(){return("Arial");}
 
 // Chart contract: no textual engine labels. Each EA action is represented
-// only by a colored point placed on the action candle. Engine identity is
-// carried by the established engine color and detailed history lives in the
-// right-side FIFO cascade.
+// only by a compact colored point placed on the action candle. Engine
+// identity is carried by the established engine color; detailed history is
+// kept in the right-side FIFO cascade.
 void CreateEngineActionMarker(string engine,string action,int direction,double lots)
 {
    if(!EnableEngineActionMarkers||Bars<1)return;
    RefreshRates();
    datetime stamp=Time[0];
-   double price=(direction==OP_BUY?Low[0]:High[0]);
-   price=NormalizePrice(price);
+   double price=NormalizePrice(direction==OP_BUY?Low[0]:High[0]);
    color markerColor=CascadeEngineColor(engine);
    string name=ENGINE_MARKER_PREFIX+IntegerToString((int)stamp)+"_"+IntegerToString(GetTickCount())+"_"+IntegerToString(MathRand());
    if(ObjectCreate(0,name,OBJ_ARROW,0,stamp,price))
@@ -51,4 +50,4 @@ void CreateEngineActionMarker(string engine,string action,int direction,double l
 
 int OnInit(){bool reloadPersistedConfig=(GlobalVariableCheck(ConfigKey("RELOAD_ON_REINIT"))&&GlobalVariableGet(ConfigKey("RELOAD_ON_REINIT"))>0.5);if(reloadPersistedConfig){LoadPersistedConfig();GlobalVariableSet(ConfigKey("RELOAD_ON_REINIT"),0.0);}else if(!GlobalVariableCheck(ConfigKey("CONFIG_INITIALIZED"))){PersistConfigState();}ObjectsDeleteAll(0,ENGINE_MARKER_PREFIX);ObjectsDeleteAll(0,R10_MARKER_PREFIX);ArrayResize(g_r9ProcessedTickets,0);g_r9HedgeActive=false;g_r10LastAction=0;if(EnableR10RecoveryRealization){string r10Key=StateKey("g_r10RecoveryCycleActive");if(GlobalVariableCheck(r10Key)){g_r10RecoveryCycleActive=(GlobalVariableGet(r10Key)>0.5);g_r10RecoveryStartEquity=GlobalVariableGet(StateKey("g_r10RecoveryStartEquity"));g_r10RecoveryWorstEquity=GlobalVariableGet(StateKey("g_r10RecoveryWorstEquity"));}}g_r1LastDecision="DISABLED";g_r1LastReason="";g_r1LastDecisionTime=0;R13ResetObserverState(g_r13Observer);R9SeedExistingPositions();R13Observe(g_r13Observer);EAGOLD_ModPanelUpdate();EAGOLD_RealizationCascadeUpdate();EAGOLD_ChartBasketGuidesUpdate();PersistAllState(true);CreateFirstOrdersIfFlat();R13Observe(g_r13Observer);EAGOLD_ModPanelUpdate();EAGOLD_RealizationCascadeUpdate();EAGOLD_ChartBasketGuidesUpdate();PersistAllState(true);return(INIT_SUCCEEDED);}
 void OnDeinit(const int reason){PersistAllState(true);bool chartChange=(reason==REASON_CHARTCHANGE);if(!chartChange)PersistConfigState();bool restore=(reason==REASON_CLOSE||reason==REASON_CHARTCLOSE||reason==REASON_RECOMPILE);GlobalVariableSet(ConfigKey("RELOAD_ON_REINIT"),restore?1.0:0.0);GlobalVariablesFlush();EAGOLD_RealizationCascadeDelete();EAGOLD_ChartBasketGuidesDelete();EAGOLD_ModPanelDelete();}
-void OnTick(){R10RecoveryUpdateState();Rule9DetectActivatedOrders();BuyMachine();SellMachine();CreateFirstOrdersIfFlat();TrailAllStopOrders();R13Observe(g_r13Observer);EAGOLD_ModPanelUpdate();EAGOLD_RealizationCascadeUpdate();EAGOLD_ChartBasketGuidesUpdate();PersistAllState(false);}
+void OnTick(){R10RecoveryUpdateState();Rule9DetectActivatedOrders();BuyMachine();SellMachine();CreateFirstOrdersIfFlat();TrailAllStopOrders();R13Observe(g_r13Observer);ObjectsDeleteAll(0,R10_MARKER_PREFIX);EAGOLD_ModPanelUpdate();EAGOLD_RealizationCascadeUpdate();EAGOLD_ChartBasketGuidesUpdate();PersistAllState(false);}
