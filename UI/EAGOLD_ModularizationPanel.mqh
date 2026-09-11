@@ -10,6 +10,23 @@ string EAGOLD_ModPanelMoney(double value){return(DoubleToString(value,2));}
 string EAGOLD_ModPanelLots(double value){return(DoubleToString(value,2));}
 string EAGOLD_ModPanelBool(bool value){return(value?"ON":"OFF");}
 
+// Shared calculation retained because EAGOLD_ChartBasketGuides.mqh consumes
+// the weighted breakeven value. This is not displayed in the panel.
+double EAGOLD_ModPanelWeightedBE(int direction)
+{
+   double lots=0.0,weighted=0.0;
+   for(int i=OrdersTotal()-1;i>=0;i--)
+   {
+      if(!OrderSelect(i,SELECT_BY_POS,MODE_TRADES))continue;
+      if(!IsEAGOLDOrder())continue;
+      if(OrderType()!=direction)continue;
+      lots+=OrderLots();
+      weighted+=OrderOpenPrice()*OrderLots();
+   }
+   if(lots<=0.0)return(0.0);
+   return(NormalizePrice(weighted/lots));
+}
+
 string EAGOLD_ModPanelBRXMode()
 {
    if(!EnableBasketRealization)return("OFF");
