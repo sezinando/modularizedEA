@@ -68,39 +68,49 @@ void CreateEngineActionMarker(string engine,string action,int direction,double l
    string bgName=baseName+"_BG";
 
    int x=0,y=0;
-   bool screenPos=ChartTimePriceToXY(0,0,stamp,price,x,y);
+   if(!ChartTimePriceToXY(0,0,stamp,price,x,y))
+   {
+      ChartRedraw(0);
+      return;
+   }
 
+   // Same visual construction pattern used by the validated chart UI:
+   // pixel-sized rectangle first, then OBJ_TEXT over it.
+   // Tahoma 9 gives stable readability in the MT4 Strategy Tester.
+   int textWidth=StringLen(text)*7+10;
+   int textHeight=15;
+
+   if(ObjectCreate(0,bgName,OBJ_RECTANGLE_LABEL,0,0,0))
+   {
+      ObjectSetInteger(0,bgName,OBJPROP_CORNER,CORNER_LEFT_UPPER);
+      ObjectSetInteger(0,bgName,OBJPROP_BORDER_TYPE,BORDER_FLAT);
+      ObjectSetInteger(0,bgName,OBJPROP_SELECTABLE,false);
+      ObjectSetInteger(0,bgName,OBJPROP_SELECTED,false);
+      ObjectSetInteger(0,bgName,OBJPROP_HIDDEN,true);
+      ObjectSetInteger(0,bgName,OBJPROP_XDISTANCE,x-(textWidth/2));
+      ObjectSetInteger(0,bgName,OBJPROP_YDISTANCE,y-textHeight);
+      ObjectSetInteger(0,bgName,OBJPROP_XSIZE,textWidth);
+      ObjectSetInteger(0,bgName,OBJPROP_YSIZE,textHeight);
+      ObjectSetInteger(0,bgName,OBJPROP_BGCOLOR,clrBlack);
+      ObjectSetInteger(0,bgName,OBJPROP_COLOR,clrBlack);
+      ObjectSetInteger(0,bgName,OBJPROP_BACK,false);
+      ObjectSetInteger(0,bgName,OBJPROP_ZORDER,1);
+   }
+
+   // Create/update the text after the background so the text remains in the
+   // foreground and follows the same anchor convention as the source pattern.
    if(ObjectCreate(0,textName,OBJ_TEXT,0,stamp,price))
    {
+      ObjectSetInteger(0,textName,OBJPROP_ANCHOR,ANCHOR_LOWER);
+      ObjectSetInteger(0,textName,OBJPROP_SELECTABLE,false);
+      ObjectSetInteger(0,textName,OBJPROP_SELECTED,false);
+      ObjectSetInteger(0,textName,OBJPROP_HIDDEN,true);
       ObjectSetString(0,textName,OBJPROP_TEXT,text);
       ObjectSetString(0,textName,OBJPROP_FONT,"Tahoma");
       ObjectSetInteger(0,textName,OBJPROP_FONTSIZE,9);
       ObjectSetInteger(0,textName,OBJPROP_COLOR,c);
-      ObjectSetInteger(0,textName,OBJPROP_ANCHOR,(direction==OP_SELL?ANCHOR_LEFT_LOWER:ANCHOR_LEFT_UPPER));
-      ObjectSetInteger(0,textName,OBJPROP_SELECTABLE,false);
-      ObjectSetInteger(0,textName,OBJPROP_SELECTED,false);
-      ObjectSetInteger(0,textName,OBJPROP_HIDDEN,false);
       ObjectSetInteger(0,textName,OBJPROP_BACK,false);
       ObjectSetInteger(0,textName,OBJPROP_ZORDER,2);
-   }
-
-   if(screenPos && ObjectCreate(0,bgName,OBJ_RECTANGLE_LABEL,0,0,0))
-   {
-      int width=StringLen(text)*7+10;
-      int height=15;
-      ObjectSetInteger(0,bgName,OBJPROP_CORNER,CORNER_LEFT_UPPER);
-      ObjectSetInteger(0,bgName,OBJPROP_XDISTANCE,x-3);
-      ObjectSetInteger(0,bgName,OBJPROP_YDISTANCE,y-2);
-      ObjectSetInteger(0,bgName,OBJPROP_XSIZE,width);
-      ObjectSetInteger(0,bgName,OBJPROP_YSIZE,height);
-      ObjectSetInteger(0,bgName,OBJPROP_BGCOLOR,clrBlack);
-      ObjectSetInteger(0,bgName,OBJPROP_COLOR,c);
-      ObjectSetInteger(0,bgName,OBJPROP_BORDER_TYPE,BORDER_FLAT);
-      ObjectSetInteger(0,bgName,OBJPROP_SELECTABLE,false);
-      ObjectSetInteger(0,bgName,OBJPROP_SELECTED,false);
-      ObjectSetInteger(0,bgName,OBJPROP_HIDDEN,false);
-      ObjectSetInteger(0,bgName,OBJPROP_BACK,false);
-      ObjectSetInteger(0,bgName,OBJPROP_ZORDER,1);
    }
 
    ChartRedraw(0);
