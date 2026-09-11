@@ -25,7 +25,6 @@ datetime g_r1LastDecisionTime=0;
 bool g_r10RecoveryCycleActive=false;
 double g_r10RecoveryStartEquity=0.0;
 double g_r10RecoveryWorstEquity=0.0;
-R13ObserverState g_r13Observer;
 
 double PointsToPrice(double points){return(points*Point);}
 double NormalizePrice(double price){return(NormalizeDouble(price,Digits));}
@@ -39,6 +38,8 @@ double NormalizeLot(double lot){if(lot<Lot)lot=Lot;if(MaxOpenLot>0.0&&lot>MaxOpe
 #include "../Engines/EAGOLD_R13_Satellite.mqh"
 #include "../UI/EAGOLD_ModularizationPanel.mqh"
 #include "../UI/EAGOLD_ChartBasketGuides.mqh"
+
+R13ObserverState g_r13Observer;
 
 //==================================================================
 // TELEMETRY / EXECUTION ORCHESTRATION
