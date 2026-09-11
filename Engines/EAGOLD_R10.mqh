@@ -22,8 +22,9 @@ bool R10ProfitFundedAverageAdjustment(int targetDirection,double availableCapita
    closeLots=MathMin(closeLots,availableCapital/lossPerLot);
    double lotStep=MarketInfo(Symbol(),MODE_LOTSTEP);double minLot=MarketInfo(Symbol(),MODE_MINLOT);if(lotStep<=0.0)lotStep=minLot;if(lotStep<=0.0)lotStep=Lot;
    closeLots=MathFloor((closeLots+1.0e-10)/lotStep)*lotStep;closeLots=NormalizeDouble(closeLots,DigitsLots);if(closeLots<minLot||closeLots<Lot)return(false);
+   double beforeExposure=ExposureLots(),beforeGross=DirectionLots(OP_BUY)+DirectionLots(OP_SELL);
    double money=0.0;if(!CloseMarketOrderLots(ticket,closeLots,money))return(false);if(money>=0.0)return(false);
-   realizedLoss=money;usedCapital=MathMin(availableCapital,MathAbs(money));reducedLots=closeLots;double beforeExposure=ExposureLots();double beforeGross=DirectionLots(OP_BUY)+DirectionLots(OP_SELL);double afterExposure=ExposureLots();double afterGross=DirectionLots(OP_BUY)+DirectionLots(OP_SELL);
+   realizedLoss=money;usedCapital=MathMin(availableCapital,MathAbs(money));reducedLots=closeLots;double afterExposure=ExposureLots();double afterGross=DirectionLots(OP_BUY)+DirectionLots(OP_SELL);
    if(afterExposure>beforeExposure+0.00001){Print(EA_NAME," R10 AVG ADJUST SAFETY FAILURE: exposure increased.");return(false);}
    Print(EA_NAME," R10 AVG ADJUST: side=",(type==OP_BUY?"BUY":"SELL")," ticket=",ticket," reduced=",DoubleToString(closeLots,DigitsLots)," fundedLoss=$",DoubleToString(MathAbs(money),2)," capitalBefore=$",DoubleToString(availableCapital,2)," capitalUsed=$",DoubleToString(usedCapital,2)," open=",DoubleToString(worstOpen,Digits)," exposure ",DoubleToString(beforeExposure,DigitsLots)," -> ",DoubleToString(afterExposure,DigitsLots));
    CreateR10VisualMarker(targetDirection,closeLots,money,beforeExposure,afterExposure,beforeGross,afterGross);CreateEngineActionMarker("R10","AVG_ADJUST",targetDirection,closeLots);return(true);}
