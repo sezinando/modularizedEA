@@ -52,6 +52,21 @@ double EngineMarkerPipsToPrice(double pips)
    return(pips*pipSize);
 }
 
+// Assign each engine family to its own vertical lane. This prevents
+// simultaneous actions from being painted on the same Y coordinate.
+int EngineMarkerStackLevel(string engine)
+{
+   if(engine=="R1")   return(0);
+   if(engine=="R1.1") return(1);
+   if(engine=="R4")   return(2);
+   if(engine=="R5")   return(3);
+   if(engine=="BRX")  return(3);
+   if(engine=="R7")   return(4);
+   if(engine=="R10")  return(5);
+   if(engine=="R13")  return(6);
+   return(7);
+}
+
 // Resolve the requested display font while keeping the visual contract
 // portable across MT4 terminals. Impact is preferred, followed by the
 // supplied alternatives. TextSetFont() returns false when a font is absent.
@@ -79,7 +94,9 @@ void CreateEngineActionMarker(string engine,string action,int direction,double l
    RefreshRates();
 
    datetime stamp=Time[0];
-   double price=NormalizePrice(High[0]+EngineMarkerPipsToPrice(EngineActionMarkerOffsetPips));
+   int stackLevel=EngineMarkerStackLevel(engine);
+   double offsetPips=EngineActionMarkerOffsetPips+(stackLevel*EngineActionMarkerStackStepPips);
+   double price=NormalizePrice(High[0]+EngineMarkerPipsToPrice(offsetPips));
    string text=engine+" "+action;
    if(lots>=Lot)text+=" "+DoubleToString(lots,DigitsLots);
 
