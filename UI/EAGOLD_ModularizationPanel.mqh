@@ -146,32 +146,36 @@ void EAGOLD_ModPanelUpdate()
    double recoveryDebt=R10RecoveryDebt();
    double recoveryRemaining=R10RecoveryRemainingDebt();
 
-   // Historical minimum/maximum are owned by the panel and mirrored into
-   // the legacy persistence variables before PersistAllState() runs.
-   // MENOR P/L may only move downward; MAIOR ACUM. may only move upward.
-   string minKey=StateKey("PANEL_MIN_PROFIT");
-   string maxKey=StateKey("MAX_ACCUM_LOTS");
-   if(GlobalVariableCheck(minKey))
-      g_modPanelMinProfit=MathMin(GlobalVariableGet(minKey),totalProfit);
-   else
-      g_modPanelMinProfit=totalProfit;
-   if(GlobalVariableCheck(maxKey))
-      g_modPanelMaxLots=MathMax(GlobalVariableGet(maxKey),grossLots);
-   else
-      g_modPanelMaxLots=grossLots;
-   g_modPanelInitialized=true;
+   // Historical extrema are runtime memory first. GlobalVariables are touched
+   // only when an extrema changes, not on every tick.
+   if(!g_modPanelInitialized)
+   {
+      string minKey=StateKey("PANEL_MIN_PROFIT");
+      string maxKey=StateKey("MAX_ACCUM_LOTS");
+      g_modPanelMinProfit=GlobalVariableCheck(minKey)?GlobalVariableGet(minKey):totalProfit;
+      g_modPanelMaxLots=GlobalVariableCheck(maxKey)?GlobalVariableGet(maxKey):grossLots;
+      g_modPanelInitialized=true;
+   }
 
-   // Keep the persistence-layer compatibility state synchronized. Without
-   // this mirror, PersistAllState() could reintroduce a stale historical
-   // value after the panel had already rebuilt the metric from the current
-   // GlobalVariable state (especially after manual deletion/reset).
+   bool extremaChanged=false;
+   if(totalProfit<g_modPanelMinProfit)
+   {
+      g_modPanelMinProfit=totalProfit;
+      extremaChanged=true;
+   }
+   if(grossLots>g_modPanelMaxLots)
+   {
+      g_modPanelMaxLots=grossLots;
+      extremaChanged=true;
+   }
+   if(extremaChanged)
+      PersistPanelExtrema(g_modPanelMinProfit,g_modPanelMaxLots);
+
+   // Keep the persistence-layer compatibility state synchronized in memory.
+   // No GlobalVariable write occurs here unless an actual extrema change happened.
    g_panelMinProfit=g_modPanelMinProfit;
    g_panelMaxLots=g_modPanelMaxLots;
    g_panelInitialized=g_modPanelInitialized;
-
-   GlobalVariableSet(minKey,g_modPanelMinProfit);
-   GlobalVariableSet(maxKey,g_modPanelMaxLots);
-   GlobalVariablesFlush();
 
    int row=0;
    EAGOLD_ModPanelBackground(true,EnableModularizationDebug?670:550);
