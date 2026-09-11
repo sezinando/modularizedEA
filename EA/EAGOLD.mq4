@@ -19,8 +19,36 @@ double PointsToPrice(double points){return(points*Point);}double NormalizePrice(
 R13ObserverState g_r13Observer;
 double EngineMarkerPipsToPrice(double pips){double pipSize=Point;if(Digits==3||Digits==5)pipSize=Point*10.0;return(pips*pipSize);}
 int EngineMarkerStackLevel(string engine){if(engine=="R1")return(0);if(engine=="R1.1")return(1);if(engine=="R4")return(2);if(engine=="R5"||engine=="BRX")return(3);if(engine=="R7")return(4);if(engine=="R10")return(5);if(engine=="R13")return(6);return(7);}
-string ResolveEngineMarkerFont(){string fonts[3];fonts[0]=EngineActionMarkerFont;fonts[1]="Arial Black";fonts[2]="Trebuchet MS";for(int i=0;i<3;i++){if(fonts[i]=="")continue;if(TextSetFont(fonts[i],EngineActionMarkerFontSize,FW_BLACK))return(fonts[i]);}return("Arial");}
-void CreateEngineActionMarker(string engine,string action,int direction,double lots){if(!EnableEngineActionMarkers)return;if(Bars<1)return;EAGOLD_ActionCascadeAdd(engine);RefreshRates();datetime stamp=Time[0];int stackLevel=EngineMarkerStackLevel(engine);double offsetPips=EngineActionMarkerOffsetPips+(stackLevel*EngineActionMarkerStackStepPips);double price=NormalizePrice(High[0]+EngineMarkerPipsToPrice(offsetPips));string text=engine+" "+action;if(lots>=Lot)text+=" "+DoubleToString(lots,DigitsLots);string fontName=ResolveEngineMarkerFont();uint textWidth=0,textHeight=0;if(!TextGetSize(text,textWidth,textHeight)){textWidth=(uint)(StringLen(text)*8+10);textHeight=(uint)(EngineActionMarkerFontSize+7);}int boxWidth=(int)textWidth+10,boxHeight=(int)textHeight+4;string baseName=ENGINE_MARKER_PREFIX+IntegerToString((int)stamp)+"_"+IntegerToString(GetTickCount())+"_"+IntegerToString(MathRand()),textName=baseName+"_TXT",bgName=baseName+"_BG";int x=0,y=0;if(!ChartTimePriceToXY(0,0,stamp,price,x,y)){ChartRedraw(0);return;}if(ObjectCreate(0,bgName,OBJ_RECTANGLE_LABEL,0,0,0)){ObjectSetInteger(0,bgName,OBJPROP_CORNER,CORNER_LEFT_UPPER);ObjectSetInteger(0,bgName,OBJPROP_BORDER_TYPE,BORDER_FLAT);ObjectSetInteger(0,bgName,OBJPROP_SELECTABLE,false);ObjectSetInteger(0,bgName,OBJPROP_SELECTED,false);ObjectSetInteger(0,bgName,OBJPROP_HIDDEN,true);ObjectSetInteger(0,bgName,OBJPROP_XDISTANCE,x-(boxWidth/2));ObjectSetInteger(0,bgName,OBJPROP_YDISTANCE,y-boxHeight);ObjectSetInteger(0,bgName,OBJPROP_XSIZE,boxWidth);ObjectSetInteger(0,bgName,OBJPROP_YSIZE,boxHeight);ObjectSetInteger(0,bgName,OBJPROP_BGCOLOR,EngineActionMarkerBackgroundColor);ObjectSetInteger(0,bgName,OBJPROP_COLOR,EngineActionMarkerBackgroundColor);ObjectSetInteger(0,bgName,OBJPROP_BACK,false);ObjectSetInteger(0,bgName,OBJPROP_ZORDER,1);}if(ObjectCreate(0,textName,OBJ_TEXT,0,stamp,price)){ObjectSetInteger(0,textName,OBJPROP_ANCHOR,ANCHOR_LOWER);ObjectSetInteger(0,textName,OBJPROP_SELECTABLE,false);ObjectSetInteger(0,textName,OBJPROP_SELECTED,false);ObjectSetInteger(0,textName,OBJPROP_HIDDEN,true);ObjectSetString(0,textName,OBJPROP_TEXT,text);ObjectSetString(0,textName,OBJPROP_FONT,fontName);ObjectSetInteger(0,textName,OBJPROP_FONTSIZE,EngineActionMarkerFontSize);ObjectSetInteger(0,textName,OBJPROP_COLOR,EngineActionMarkerTextColor);ObjectSetInteger(0,textName,OBJPROP_BACK,false);ObjectSetInteger(0,textName,OBJPROP_ZORDER,2);}ChartRedraw(0);}
-int OnInit(){bool reloadPersistedConfig=(GlobalVariableCheck(ConfigKey("RELOAD_ON_REINIT"))&&GlobalVariableGet(ConfigKey("RELOAD_ON_REINIT"))>0.5);if(reloadPersistedConfig){LoadPersistedConfig();GlobalVariableSet(ConfigKey("RELOAD_ON_REINIT"),0.0);}else if(!GlobalVariableCheck(ConfigKey("CONFIG_INITIALIZED"))){PersistConfigState();}ArrayResize(g_r9ProcessedTickets,0);g_r9HedgeActive=false;g_r10LastAction=0;if(EnableR10RecoveryRealization){string r10Key=StateKey("g_r10RecoveryCycleActive");if(GlobalVariableCheck(r10Key)){g_r10RecoveryCycleActive=(GlobalVariableGet(r10Key)>0.5);g_r10RecoveryStartEquity=GlobalVariableGet(StateKey("g_r10RecoveryStartEquity"));g_r10RecoveryWorstEquity=GlobalVariableGet(StateKey("g_r10RecoveryWorstEquity"));}}g_r1LastDecision="DISABLED";g_r1LastReason="";g_r1LastDecisionTime=0;R13ResetObserverState(g_r13Observer);R9SeedExistingPositions();R13Observe(g_r13Observer);EAGOLD_ModPanelUpdate();EAGOLD_RealizationCascadeUpdate();EAGOLD_ChartBasketGuidesUpdate();PersistAllState(true);CreateFirstOrdersIfFlat();R13Observe(g_r13Observer);EAGOLD_ModPanelUpdate();EAGOLD_RealizationCascadeUpdate();EAGOLD_ChartBasketGuidesUpdate();PersistAllState(true);return(INIT_SUCCEEDED);}
+string ResolveEngineMarkerFont(){return("Arial");}
+
+// Chart contract: no textual engine labels. Each EA action is represented
+// only by a colored point placed on the action candle. Engine identity is
+// carried by the established engine color and detailed history lives in the
+// right-side FIFO cascade.
+void CreateEngineActionMarker(string engine,string action,int direction,double lots)
+{
+   if(!EnableEngineActionMarkers||Bars<1)return;
+   RefreshRates();
+   datetime stamp=Time[0];
+   double price=(direction==OP_BUY?Low[0]:High[0]);
+   price=NormalizePrice(price);
+   color markerColor=CascadeEngineColor(engine);
+   string name=ENGINE_MARKER_PREFIX+IntegerToString((int)stamp)+"_"+IntegerToString(GetTickCount())+"_"+IntegerToString(MathRand());
+   if(ObjectCreate(0,name,OBJ_ARROW,0,stamp,price))
+   {
+      ObjectSetInteger(0,name,OBJPROP_ARROWCODE,159);
+      ObjectSetInteger(0,name,OBJPROP_WIDTH,2);
+      ObjectSetInteger(0,name,OBJPROP_COLOR,markerColor);
+      ObjectSetInteger(0,name,OBJPROP_SELECTABLE,false);
+      ObjectSetInteger(0,name,OBJPROP_SELECTED,false);
+      ObjectSetInteger(0,name,OBJPROP_HIDDEN,true);
+      ObjectSetInteger(0,name,OBJPROP_BACK,false);
+      ObjectSetInteger(0,name,OBJPROP_ZORDER,5);
+   }
+   EAGOLD_ActionCascadeAdd(engine);
+   ChartRedraw(0);
+}
+
+int OnInit(){bool reloadPersistedConfig=(GlobalVariableCheck(ConfigKey("RELOAD_ON_REINIT"))&&GlobalVariableGet(ConfigKey("RELOAD_ON_REINIT"))>0.5);if(reloadPersistedConfig){LoadPersistedConfig();GlobalVariableSet(ConfigKey("RELOAD_ON_REINIT"),0.0);}else if(!GlobalVariableCheck(ConfigKey("CONFIG_INITIALIZED"))){PersistConfigState();}ObjectsDeleteAll(0,ENGINE_MARKER_PREFIX);ObjectsDeleteAll(0,R10_MARKER_PREFIX);ArrayResize(g_r9ProcessedTickets,0);g_r9HedgeActive=false;g_r10LastAction=0;if(EnableR10RecoveryRealization){string r10Key=StateKey("g_r10RecoveryCycleActive");if(GlobalVariableCheck(r10Key)){g_r10RecoveryCycleActive=(GlobalVariableGet(r10Key)>0.5);g_r10RecoveryStartEquity=GlobalVariableGet(StateKey("g_r10RecoveryStartEquity"));g_r10RecoveryWorstEquity=GlobalVariableGet(StateKey("g_r10RecoveryWorstEquity"));}}g_r1LastDecision="DISABLED";g_r1LastReason="";g_r1LastDecisionTime=0;R13ResetObserverState(g_r13Observer);R9SeedExistingPositions();R13Observe(g_r13Observer);EAGOLD_ModPanelUpdate();EAGOLD_RealizationCascadeUpdate();EAGOLD_ChartBasketGuidesUpdate();PersistAllState(true);CreateFirstOrdersIfFlat();R13Observe(g_r13Observer);EAGOLD_ModPanelUpdate();EAGOLD_RealizationCascadeUpdate();EAGOLD_ChartBasketGuidesUpdate();PersistAllState(true);return(INIT_SUCCEEDED);}
 void OnDeinit(const int reason){PersistAllState(true);bool chartChange=(reason==REASON_CHARTCHANGE);if(!chartChange)PersistConfigState();bool restore=(reason==REASON_CLOSE||reason==REASON_CHARTCLOSE||reason==REASON_RECOMPILE);GlobalVariableSet(ConfigKey("RELOAD_ON_REINIT"),restore?1.0:0.0);GlobalVariablesFlush();EAGOLD_RealizationCascadeDelete();EAGOLD_ChartBasketGuidesDelete();EAGOLD_ModPanelDelete();}
 void OnTick(){R10RecoveryUpdateState();Rule9DetectActivatedOrders();BuyMachine();SellMachine();CreateFirstOrdersIfFlat();TrailAllStopOrders();R13Observe(g_r13Observer);EAGOLD_ModPanelUpdate();EAGOLD_RealizationCascadeUpdate();EAGOLD_ChartBasketGuidesUpdate();PersistAllState(false);}
