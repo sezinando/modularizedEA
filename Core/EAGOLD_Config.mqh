@@ -9,10 +9,19 @@
 
 #define EAGOLD_VERSION "0.106"
 #define EAGOLD_R13_DEFAULT_COMMENT "EAGOLD_RECOVERY_SATELLITE"
+#define EAGOLD_EXPIRY_DATE D'2026.12.31 00:00'
 
 double g_panelMinProfit=0.0;
 double g_panelMaxLots=0.0;
 bool g_panelInitialized=false;
+
+// Test-license policy: trading is allowed through 30/12/2026 23:59:59
+// using broker/server time. From 31/12/2026 00:00 onward no new orders
+// may be submitted. Existing orders remain manageable/closable.
+bool EAGOLD_TradingAllowed()
+{
+   return(TimeCurrent()<EAGOLD_EXPIRY_DATE);
+}
 
 input string INPUT_GROUP_GENERAL="=== GENERAL / IDENTITY ===";
 // -1 = TODOS os pedidos/ordens do símbolo, independentemente do Magic.
@@ -62,7 +71,6 @@ extern double GlobalStopTrailMinStepPoints=0.0;
 
 input string INPUT_GROUP_BRX="=== BRX BASKET REALIZATION ENGINE ===";
 extern bool EnableBasketRealization=true;
-// 0=LEGACY COUNT*TP | 1=DIRECTIONAL | 2=BIDIRECTIONAL | 3=HYBRID
 extern int BRXRealizationMode=3;
 extern double BRXDirectionalMinProfit=5.00;
 extern double BRXBidirectionalMinProfit=5.00;
@@ -126,12 +134,8 @@ extern string EngineActionMarkerFont="Impact";
 extern int EngineActionMarkerFontSize=9;
 extern color EngineActionMarkerTextColor=clrYellow;
 extern color EngineActionMarkerBackgroundColor=clrBlack;
-// Base vertical distance from the current candle high. Engine-specific
-// stacking below separates simultaneous engine labels to reduce overlap.
 extern double EngineActionMarkerOffsetPips=20.0;
 extern double EngineActionMarkerStackStepPips=20.0;
-// Legacy persistence field retained so older persistence code compiles.
-// The visual engine uses EngineActionMarkerOffsetPips.
 double EngineActionMarkerOffsetPoints=100.0;
 
 input string INPUT_GROUP_R102="=== R10.2 RECOVERY REALIZATION ===";
@@ -155,10 +159,6 @@ extern int PanelBottomX1=15;
 extern int PanelBottomX2=190;
 extern int PanelBottomX3=520;
 extern int PanelBottomX4=850;
-
-//==================================================================
-// LAYOUT / VISUAL ADJUSTMENTS
-//==================================================================
 extern int PanelBackgroundWidth=430;
 
 #endif
