@@ -127,9 +127,14 @@ extern int R10MarkerFontSize=9;
 extern color R10BuyMarkerColor=clrLime;
 extern color R10SellMarkerColor=clrTomato;
 extern double R10MarkerOffsetPoints=25.0;
+
+input string INPUT_GROUP_ENGINE_MARKERS="=== ENGINE ACTION MARKERS ===";
 extern bool EnableEngineActionMarkers=true;
-extern int EngineActionMarkerFontSize=8;
-extern double EngineActionMarkerOffsetPoints=18.0;
+extern string EngineActionMarkerFont="Impact";
+extern int EngineActionMarkerFontSize=9;
+extern color EngineActionMarkerTextColor=clrYellow;
+extern color EngineActionMarkerBackgroundColor=clrBlack;
+extern double EngineActionMarkerOffsetPips=10.0;
 
 input string INPUT_GROUP_R102="=== R10.2 RECOVERY REALIZATION ===";
 extern bool EnableR10RecoveryRealization=false;
