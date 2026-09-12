@@ -2,7 +2,7 @@
 #define EAGOLD_R12_REGIME_OBSERVER_MQH
 
 //==================================================================
-// EAGOLD R12 REGIME OBSERVER v1.0
+// EAGOLD R12 REGIME OBSERVER v1.1
 // Observer-only market regime classification for telemetry.
 //
 // CONTRACT
@@ -10,7 +10,8 @@
 // - MUST NOT change lot sizing, TP, BRX, R9, R10, R11 or R13 behavior.
 // - Primary timeframe: M5.
 // - Classification is based only on closed candles (shift 1+).
-// - This is a deterministic first observer, not an adaptive trading gate.
+// - Persistence/transition fields are telemetry only.
+// - This is a deterministic observer, not an adaptive trading gate.
 //==================================================================
 
 enum EAGOLD_R12_Regime
@@ -47,6 +48,15 @@ struct EAGOLD_R12_State
 {
    datetime time;
    EAGOLD_R12_Regime regime;
+   EAGOLD_R12_Regime previousRegime;
+   datetime regimeStartTime;
+   datetime previousRegimeChangeTime;
+   int regimeTransitionCount;
+   int regimeSequenceCount;
+   string regimeSequence;
+   double regimeDurationSec;
+   double timeSinceRegimeChangeSec;
+   bool regimeChange;
    double close;
    double atr;
    double atrRatio;
@@ -64,6 +74,15 @@ void EAGOLD_R12Reset(EAGOLD_R12_State &s)
 {
    s.time=0;
    s.regime=EAGOLD_R12_UNKNOWN;
+   s.previousRegime=EAGOLD_R12_UNKNOWN;
+   s.regimeStartTime=0;
+   s.previousRegimeChangeTime=0;
+   s.regimeTransitionCount=0;
+   s.regimeSequenceCount=0;
+   s.regimeSequence="";
+   s.regimeDurationSec=0.0;
+   s.timeSinceRegimeChangeSec=0.0;
+   s.regimeChange=false;
    s.close=0.0;
    s.atr=0.0;
    s.atrRatio=0.0;
@@ -121,7 +140,62 @@ bool EAGOLD_R12Update(EAGOLD_R12_State &s)
    bool bearTransition=(fast<slow && slopeFast<0.0 && slopeSlow>=-0.03 && drift<0.0);
    bool exhaustion=(MathAbs(drift)>=2.00 && bodyRatio>=0.70);
 
-   s.time=iTime(Symbol(),PERIOD_M5,sh);
+   EAGOLD_R12_Regime previous=g_r12State.regime;
+   datetime previousStart=g_r12State.regimeStartTime;
+   datetime lastChange=g_r12State.previousRegimeChangeTime;
+   int transitions=g_r12State.regimeTransitionCount;
+   int sequenceCount=g_r12State.regimeSequenceCount;
+   string sequence=g_r12State.regimeSequence;
+
+   EAGOLD_R12_Regime current=EAGOLD_R12_CONFLICT;
+   if(highVol)current=EAGOLD_R12_HIGH_VOLATILITY;
+   else if(exhaustion)current=EAGOLD_R12_EXHAUSTION;
+   else if(bullStructure)current=EAGOLD_R12_BULLISH_TREND;
+   else if(bearStructure)current=EAGOLD_R12_BEARISH_TREND;
+   else if(bullPullback)current=EAGOLD_R12_BULLISH_PULLBACK;
+   else if(bearPullback)current=EAGOLD_R12_BEARISH_PULLBACK;
+   else if(bullTransition)current=EAGOLD_R12_TRANSITION_BULLISH;
+   else if(bearTransition)current=EAGOLD_R12_TRANSITION_BEARISH;
+   else if(lowVol)current=EAGOLD_R12_LOW_VOLATILITY;
+
+   datetime currentTime=iTime(Symbol(),PERIOD_M5,sh);
+   bool changed=(previous!=EAGOLD_R12_UNKNOWN && current!=previous);
+   if(previous==EAGOLD_R12_UNKNOWN || previousStart<=0)
+   {
+      previousStart=currentTime;
+      lastChange=currentTime;
+      sequenceCount=1;
+      sequence=EAGOLD_R12_RegimeName(current);
+      transitions=0;
+   }
+   else if(changed)
+   {
+      transitions++;
+      sequenceCount++;
+      previousStart=currentTime;
+      lastChange=currentTime;
+      string nextName=EAGOLD_R12_RegimeName(current);
+      if(sequence=="")sequence=nextName;
+      else sequence=sequence+">"+nextName;
+      // Prevent unbounded telemetry strings during long EA sessions.
+      if(StringLen(sequence)>900)
+      {
+         int cut=StringFind(sequence,">");
+         if(cut>=0)sequence=StringSubstr(sequence,cut+1);
+      }
+   }
+
+   s.time=currentTime;
+   s.regime=current;
+   s.previousRegime=previous;
+   s.regimeStartTime=previousStart;
+   s.previousRegimeChangeTime=lastChange;
+   s.regimeTransitionCount=transitions;
+   s.regimeSequenceCount=sequenceCount;
+   s.regimeSequence=sequence;
+   s.regimeDurationSec=(double)MathMax(0,(int)(currentTime-previousStart));
+   s.timeSinceRegimeChangeSec=(double)MathMax(0,(int)(currentTime-lastChange));
+   s.regimeChange=changed;
    s.close=close;
    s.atr=atr;
    s.atrRatio=atrRatio;
@@ -131,20 +205,6 @@ bool EAGOLD_R12Update(EAGOLD_R12_State &s)
    s.rangeRatio=rangeRatio;
    s.bodyRatio=bodyRatio;
    s.valid=true;
-
-   // Priority intentionally puts exceptional volatility first, then
-   // directional structure, then pullback/transition/consolidation.
-   if(highVol)s.regime=EAGOLD_R12_HIGH_VOLATILITY;
-   else if(exhaustion)s.regime=EAGOLD_R12_EXHAUSTION;
-   else if(bullStructure)s.regime=EAGOLD_R12_BULLISH_TREND;
-   else if(bearStructure)s.regime=EAGOLD_R12_BEARISH_TREND;
-   else if(bullPullback)s.regime=EAGOLD_R12_BULLISH_PULLBACK;
-   else if(bearPullback)s.regime=EAGOLD_R12_BEARISH_PULLBACK;
-   else if(bullTransition)s.regime=EAGOLD_R12_TRANSITION_BULLISH;
-   else if(bearTransition)s.regime=EAGOLD_R12_TRANSITION_BEARISH;
-   else if(lowVol)s.regime=EAGOLD_R12_LOW_VOLATILITY;
-   else s.regime=EAGOLD_R12_CONFLICT;
-
    return(true);
 }
 
