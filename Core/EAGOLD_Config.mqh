@@ -76,11 +76,13 @@ extern double BRXDirectionalMinProfit=5.00;
 extern double BRXBidirectionalMinProfit=5.00;
 // Extra floating-P/L cushion required before a realization is authorized.
 // This protects the realization floor against normal execution movement/slippage.
+// Runtime validation baseline: nominal floor 5.00 + safety buffer 5.00 = 10.00.
 extern double BRXRealizationSafetyBuffer=5.00;
 extern bool BRXRequireWeightedBE=false;
 extern double BRXWeightedBEBufferPoints=0.0;
 
 input string INPUT_GROUP_R13="=== R13 RECOVERY SATELLITE ===";
+// Runtime BRX isolation baseline: R13 disabled so it cannot affect BRX tests.
 extern bool EnableR13=false;
 extern bool EnableR13AutoActivation=false;
 extern bool EnableR13Trading=false;
@@ -111,16 +113,18 @@ extern bool EnableChartBasketGuides=true;
 extern int ChartBasketGuideOffsetBars=2;
 
 input string INPUT_GROUP_R9="=== R9 EXPOSURE CONTROLLER ===";
-extern bool EnableR9Hedge=true;
+// Runtime BRX isolation baseline: R9 disabled during isolated BRX tests.
+extern bool EnableR9Hedge=false;
 extern double R9ExposureTriggerLots=1.00;
 extern double R9TriggerLotMinimum=0.00;
 extern double R9HedgeFraction=0.6666666667;
 extern double R9BalanceCap=0.50;
 
 input string INPUT_GROUP_R10="=== R10 EXPOSURE REDUCTION ===";
-extern bool EnableR10Reduce=true;
+// Runtime BRX isolation baseline: R10 disabled for the first BRX test battery.
+extern bool EnableR10Reduce=false;
 extern double R10MinExposureLots=0.01;
-extern bool EnableR10PairReduction=true;
+extern bool EnableR10PairReduction=false;
 extern double R10PairMinProfit=5.00;
 extern double R10PairMaxLots=1.00;
 extern int R10PairCooldownSeconds=30;
@@ -142,6 +146,7 @@ extern double EngineActionMarkerStackStepPips=20.0;
 double EngineActionMarkerOffsetPoints=100.0;
 
 input string INPUT_GROUP_R102="=== R10.2 RECOVERY REALIZATION ===";
+// Runtime BRX isolation baseline: R10.2 disabled for the isolated battery.
 extern bool EnableR10RecoveryRealization=false;
 extern double R10RecoveryMinDebt=100.0;
 extern double R10RecoveryProfitTarget=50.0;
