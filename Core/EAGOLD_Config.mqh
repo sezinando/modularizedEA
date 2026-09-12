@@ -3,10 +3,10 @@
 
 //==================================================================
 // EAGOLD CONFIGURATION CONTRACT
-// Centralized input configuration extracted from EAGOLD v0.108.
+// Centralized input configuration extracted from EAGOLD v0.109.
 // Keep business behavior out of this file.
 //==================================================================
-#define EAGOLD_VERSION "0.108"
+#define EAGOLD_VERSION "0.109"
 #define EAGOLD_R13_DEFAULT_COMMENT "EAGOLD_RECOVERY_SATELLITE"
 #define EAGOLD_EXPIRY_DATE D'2026.12.31 00:00'
 
@@ -128,6 +128,8 @@ extern color EngineActionMarkerBackgroundColor=clrBlack;
 extern double EngineActionMarkerOffsetPips=20.0;
 extern double EngineActionMarkerStackStepPips=20.0;
 double EngineActionMarkerOffsetPoints=100.0;
+input string INPUT_GROUP_COUNTERFACTUAL_TELEMETRY="=== 07A COUNTERFACTUAL PATH TELEMETRY ===";
+extern bool EnableCounterfactualPathTelemetry=true;
 input string INPUT_GROUP_PANEL="=== 07 MODULAR PANEL / DEBUG ===";
 extern bool EnableModularizationPanel=true;
 extern bool EnableModularizationDebug=false;
