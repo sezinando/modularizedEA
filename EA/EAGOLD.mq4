@@ -11,7 +11,7 @@ string EA_NAME="EAGOLD";string R10_MARKER_PREFIX="EAGOLD_R10_MARKER_";string ENG
 double PointsToPrice(double points){return(points*Point);}double NormalizePrice(double price){return(NormalizeDouble(price,Digits));}double NormalizeLot(double lot){if(lot<Lot)lot=Lot;if(MaxOpenLot>0.0&&lot>MaxOpenLot)lot=MaxOpenLot;return(NormalizeDouble(lot,DigitsLots));}
 
 void EAGOLD_ResetTickTransaction(){g_eagoldTickPolicy=EAGOLD_TICK_CONTINUE;}
-bool EAGOLD_EconomicExecutionAllowed(){return(g_eagoldTickPolicy!=EAGOLD_TICK_HALT_FOR_RECONCILIATION);}
+bool EAGOLD_EconomicExecutionAllowed(){return(g_eagoldTickPolicy==EAGOLD_TICK_CONTINUE);}
 void EAGOLD_ApplyActionResult(EAGOLD_ActionResult result,string engine,string action,int direction,double lots){EAGOLD_TickPolicy policy=EAGOLD_PolicyForResult(result);Print(EA_NAME," ACTION CONTRACT engine=",engine," action=",action," result=",EAGOLD_ActionResultName(result)," policy=",EAGOLD_TickPolicyName(policy)," direction=",(direction==OP_BUY?"BUY":"SELL")," lots=",DoubleToString(lots,DigitsLots));if(result==EAGOLD_ACTION_PARTIAL)EAGOLD_R10RequestReconciliation();if(policy==EAGOLD_TICK_HALT_FOR_RECONCILIATION)g_eagoldTickPolicy=EAGOLD_TICK_HALT_FOR_RECONCILIATION;else if(policy==EAGOLD_TICK_CONSUME&&g_eagoldTickPolicy==EAGOLD_TICK_CONTINUE)g_eagoldTickPolicy=EAGOLD_TICK_CONSUME;}
 
 #include "../UI/EAGOLD_RealizationCascade.mqh"
