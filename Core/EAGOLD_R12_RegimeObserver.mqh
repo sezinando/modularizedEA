@@ -2,8 +2,17 @@
 #define EAGOLD_R12_REGIME_OBSERVER_MQH
 
 //==================================================================
-// EAGOLD R12 REGIME OBSERVER v1.1
+// EAGOLD R12 REGIME OBSERVER v1.2
 // Observer-only market regime classification for telemetry.
+// Event-boundary history is accumulated between realization events.
+//
+// CONTRACT
+// - MUST NOT submit, modify or close orders.
+// - MUST NOT change lot sizing, TP, BRX, R9, R10, R11 or R13 behavior.
+// - Primary timeframe: M5.
+// - Classification is based only on closed candles (shift 1+).
+// - Persistence/history fields are telemetry only.
+// - This is a deterministic observer, not an adaptive trading gate.
 //==================================================================
 
 enum EAGOLD_R12_Regime
@@ -49,6 +58,12 @@ struct EAGOLD_R12_State
    double regimeDurationSec;
    double timeSinceRegimeChangeSec;
    bool regimeChange;
+   int eventBoundaryTransitionCount;
+   int eventBoundarySequenceCount;
+   datetime eventBoundaryStartTime;
+   datetime eventBoundaryLastChangeTime;
+   string eventBoundaryRegimeSequence;
+   double eventBoundaryDurationSec;
    double close;
    double atr;
    double atrRatio;
@@ -68,16 +83,83 @@ int g_r12TransitionCount=0;
 int g_r12SequenceCount=0;
 string g_r12RegimeSequence="";
 
+// Event-boundary history. Updated only when a new closed M5 candle is observed.
+datetime g_r12LastObservedCandleTime=0;
+datetime g_r12EventBoundaryStartTime=0;
+datetime g_r12EventBoundaryLastChangeTime=0;
+int g_r12EventBoundaryTransitionCount=0;
+int g_r12EventBoundarySequenceCount=0;
+string g_r12EventBoundaryRegimeSequence="";
+
 void EAGOLD_R12Reset(EAGOLD_R12_State &s)
 {
    s.time=0;s.regime=EAGOLD_R12_UNKNOWN;s.previousRegime=EAGOLD_R12_UNKNOWN;
    s.regimeStartTime=0;s.previousRegimeChangeTime=0;s.regimeTransitionCount=0;s.regimeSequenceCount=0;s.regimeSequence="";
    s.regimeDurationSec=0.0;s.timeSinceRegimeChangeSec=0.0;s.regimeChange=false;
+   s.eventBoundaryTransitionCount=0;s.eventBoundarySequenceCount=0;s.eventBoundaryStartTime=0;s.eventBoundaryLastChangeTime=0;s.eventBoundaryRegimeSequence="";s.eventBoundaryDurationSec=0.0;
    s.close=0.0;s.atr=0.0;s.atrRatio=0.0;s.drift=0.0;s.slopeFast=0.0;s.slopeSlow=0.0;s.rangeRatio=0.0;s.bodyRatio=0.0;s.valid=false;
 }
 
 double EAGOLD_R12SMA(int period,int shift){return(iMA(Symbol(),PERIOD_M5,period,0,MODE_SMA,PRICE_CLOSE,shift));}
 double EAGOLD_R12ATR(int period,int shift){return(iATR(Symbol(),PERIOD_M5,period,shift));}
+
+void EAGOLD_R12AppendEventBoundary(EAGOLD_R12_Regime regime,datetime candleTime)
+{
+   string name=EAGOLD_R12_RegimeName(regime);
+   if(g_r12EventBoundaryStartTime<=0)
+   {
+      g_r12EventBoundaryStartTime=candleTime;
+      g_r12EventBoundaryLastChangeTime=candleTime;
+      g_r12EventBoundaryTransitionCount=0;
+      g_r12EventBoundarySequenceCount=1;
+      g_r12EventBoundaryRegimeSequence=name;
+      return;
+   }
+   if(g_r12EventBoundarySequenceCount<=0)
+   {
+      g_r12EventBoundarySequenceCount=1;
+      g_r12EventBoundaryRegimeSequence=name;
+      g_r12EventBoundaryStartTime=candleTime;
+      g_r12EventBoundaryLastChangeTime=candleTime;
+      return;
+   }
+   string lastName="";
+   int pos=StringFind(g_r12EventBoundaryRegimeSequence,">");
+   if(pos<0)lastName=g_r12EventBoundaryRegimeSequence;
+   else
+   {
+      int scan=pos;
+      while(scan>=0)
+      {
+         int next=StringFind(g_r12EventBoundaryRegimeSequence,">",scan+1);
+         if(next<0){lastName=StringSubstr(g_r12EventBoundaryRegimeSequence,scan+1);break;}
+         scan=next;
+      }
+   }
+   if(name!=lastName)
+   {
+      g_r12EventBoundaryTransitionCount++;
+      g_r12EventBoundarySequenceCount++;
+      g_r12EventBoundaryLastChangeTime=candleTime;
+      if(g_r12EventBoundaryRegimeSequence=="")g_r12EventBoundaryRegimeSequence=name;
+      else g_r12EventBoundaryRegimeSequence=g_r12EventBoundaryRegimeSequence+">"+name;
+      if(StringLen(g_r12EventBoundaryRegimeSequence)>900)
+      {
+         int cut=StringFind(g_r12EventBoundaryRegimeSequence,">");
+         if(cut>=0)g_r12EventBoundaryRegimeSequence=StringSubstr(g_r12EventBoundaryRegimeSequence,cut+1);
+      }
+   }
+}
+
+void EAGOLD_R12ResetEventBoundary()
+{
+   if(!g_r12State.valid)return;
+   g_r12EventBoundaryStartTime=g_r12State.time;
+   g_r12EventBoundaryLastChangeTime=g_r12State.time;
+   g_r12EventBoundaryTransitionCount=0;
+   g_r12EventBoundarySequenceCount=1;
+   g_r12EventBoundaryRegimeSequence=EAGOLD_R12_RegimeName(g_r12State.regime);
+}
 
 bool EAGOLD_R12Update(EAGOLD_R12_State &s)
 {
@@ -103,9 +185,17 @@ bool EAGOLD_R12Update(EAGOLD_R12_State &s)
    if(previous==EAGOLD_R12_UNKNOWN||g_r12RegimeStartTime<=0){g_r12RegimeStartTime=currentTime;g_r12LastRegimeChangeTime=currentTime;g_r12SequenceCount=1;g_r12RegimeSequence=EAGOLD_R12_RegimeName(current);g_r12TransitionCount=0;changed=false;}
    else if(changed){g_r12TransitionCount++;g_r12SequenceCount++;g_r12RegimeStartTime=currentTime;g_r12LastRegimeChangeTime=currentTime;string nextName=EAGOLD_R12_RegimeName(current);if(g_r12RegimeSequence=="")g_r12RegimeSequence=nextName;else g_r12RegimeSequence=g_r12RegimeSequence+">"+nextName;if(StringLen(g_r12RegimeSequence)>900){int cut=StringFind(g_r12RegimeSequence,">");if(cut>=0)g_r12RegimeSequence=StringSubstr(g_r12RegimeSequence,cut+1);}}
 
+   // Boundary history advances once per newly closed M5 candle, not once per tick.
+   if(g_r12LastObservedCandleTime!=currentTime)
+   {
+      EAGOLD_R12AppendEventBoundary(current,currentTime);
+      g_r12LastObservedCandleTime=currentTime;
+   }
+
    s.time=currentTime;s.regime=current;s.previousRegime=previous;s.regimeStartTime=g_r12RegimeStartTime;s.previousRegimeChangeTime=g_r12LastRegimeChangeTime;
    s.regimeTransitionCount=g_r12TransitionCount;s.regimeSequenceCount=g_r12SequenceCount;s.regimeSequence=g_r12RegimeSequence;
    s.regimeDurationSec=(double)MathMax(0,(int)(currentTime-g_r12RegimeStartTime));s.timeSinceRegimeChangeSec=(double)MathMax(0,(int)(currentTime-g_r12LastRegimeChangeTime));s.regimeChange=changed;
+   s.eventBoundaryTransitionCount=g_r12EventBoundaryTransitionCount;s.eventBoundarySequenceCount=g_r12EventBoundarySequenceCount;s.eventBoundaryStartTime=g_r12EventBoundaryStartTime;s.eventBoundaryLastChangeTime=g_r12EventBoundaryLastChangeTime;s.eventBoundaryRegimeSequence=g_r12EventBoundaryRegimeSequence;s.eventBoundaryDurationSec=(double)MathMax(0,(int)(currentTime-g_r12EventBoundaryStartTime));
    s.close=close;s.atr=atr;s.atrRatio=atrRatio;s.drift=drift;s.slopeFast=slopeFast;s.slopeSlow=slopeSlow;s.rangeRatio=rangeRatio;s.bodyRatio=bodyRatio;s.valid=true;
    g_r12PreviousRegime=current;
    return(true);
