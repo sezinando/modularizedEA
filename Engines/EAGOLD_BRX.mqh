@@ -42,7 +42,7 @@ EAGOLD_ActionResult BRX_CloseDirectionTransactional(int direction,int &requested
    realized=BRX_RealizedTickets(tickets);
    if(!CloseAllDirectionPending(direction)){
       EAGOLD_R10RequestReconciliation();
-      Print(EAGOLD," BRX TRANSACTION PARTIAL: market close completed but pending cleanup failed. direction=",(direction==OP_BUY?"BUY":"SELL"));
+      Print(EA_NAME," BRX TRANSACTION PARTIAL: market close completed but pending cleanup failed. direction=",(direction==OP_BUY?"BUY":"SELL"));
       return(EAGOLD_ACTION_PARTIAL);
    }
    return(EAGOLD_ACTION_COMPLETED);
