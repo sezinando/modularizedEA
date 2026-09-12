@@ -22,6 +22,72 @@ string StateKey(string metric){return(STATE_PREFIX+Symbol()+"_"+IntegerToString(
 double PersistMonotonicMin(string key,double currentValue){if(!GlobalVariableCheck(key))return(currentValue);double stored=GlobalVariableGet(key);return(currentValue<stored?currentValue:stored);}
 double PersistMonotonicMax(string key,double currentValue){if(!GlobalVariableCheck(key))return(currentValue);double stored=GlobalVariableGet(key);return(currentValue>stored?currentValue:stored);}
 
+// R13 capital is persisted as a two-slot snapshot. The inactive slot is
+// written completely before the committed slot is switched. This prevents a
+// restart from accepting a half-written capital state.
+int R13PersistenceCommittedSlot(){
+   string key=StateKey("R13_CAP_COMMIT_SLOT");
+   if(!GlobalVariableCheck(key))return(-1);
+   double stored=GlobalVariableGet(key);
+   if(stored<0.0||stored>1.0)return(-1);
+   return((int)MathRound(stored));
+}
+
+void LoadPersistedR13State(){
+   if(!EAGOLD_PersistenceEnabled())return;
+   int slot=R13PersistenceCommittedSlot();
+   if(slot<0){
+      Print(EA_NAME," R13 persistence: no committed snapshot; capital starts at zero.");
+      return;
+   }
+   string versionKey=StateKey("R13_CAP_VERSION_"+IntegerToString(slot));
+   if(!GlobalVariableCheck(versionKey)||MathAbs(GlobalVariableGet(versionKey)-1.0)>0.0000001){
+      Print(EA_NAME," R13 persistence: invalid snapshot version; capital starts at zero.");
+      return;
+   }
+   string availableKey=StateKey("R13_CAP_AVAILABLE_"+IntegerToString(slot));
+   string usedKey=StateKey("R13_CAP_USED_"+IntegerToString(slot));
+   string entryKey=StateKey("R13_LAST_ENTRY_"+IntegerToString(slot));
+   if(!GlobalVariableCheck(availableKey)||!GlobalVariableCheck(usedKey)||!GlobalVariableCheck(entryKey)){
+      Print(EA_NAME," R13 persistence: incomplete snapshot; capital starts at zero.");
+      return;
+   }
+   double available=GlobalVariableGet(availableKey);
+   double used=GlobalVariableGet(usedKey);
+   datetime lastEntry=(datetime)GlobalVariableGet(entryKey);
+   if(available<0.0||used<0.0){
+      Print(EA_NAME," R13 persistence: invalid capital values; capital starts at zero.");
+      return;
+   }
+   g_r13RecoveryCapitalAvailable=available;
+   g_r13RecoveryCapitalUsed=used;
+   g_r13LastEntry=lastEntry;
+   Print(EA_NAME," R13 persistence restored: slot=",slot," available=$",DoubleToString(available,2)," used=$",DoubleToString(used,2)," lastEntry=",TimeToString(lastEntry,TIME_DATE|TIME_SECONDS));
+}
+
+void PersistR13State(bool force=false){
+   if(!EAGOLD_PersistenceEnabled())return;
+   static bool initialized=false;
+   static double lastAvailable=-1.0,lastUsed=-1.0,lastEntry=0.0;
+   if(!force&&initialized&&MathAbs(lastAvailable-g_r13RecoveryCapitalAvailable)<0.0000001&&MathAbs(lastUsed-g_r13RecoveryCapitalUsed)<0.0000001&&lastEntry==(double)g_r13LastEntry)return;
+
+   int committed=R13PersistenceCommittedSlot();
+   int target=(committed==0?1:0);
+   string suffix=IntegerToString(target);
+   GlobalVariableSet(StateKey("R13_CAP_VERSION_"+suffix),1.0);
+   GlobalVariableSet(StateKey("R13_CAP_AVAILABLE_"+suffix),MathMax(0.0,g_r13RecoveryCapitalAvailable));
+   GlobalVariableSet(StateKey("R13_CAP_USED_"+suffix),MathMax(0.0,g_r13RecoveryCapitalUsed));
+   GlobalVariableSet(StateKey("R13_LAST_ENTRY_"+suffix),(double)g_r13LastEntry);
+   // Commit is written last. A crash before this point leaves the previous
+   // committed slot authoritative.
+   GlobalVariableSet(StateKey("R13_CAP_COMMIT_SLOT"),(double)target);
+   initialized=true;
+   lastAvailable=g_r13RecoveryCapitalAvailable;
+   lastUsed=g_r13RecoveryCapitalUsed;
+   lastEntry=(double)g_r13LastEntry;
+   if(force)GlobalVariablesFlush();
+}
+
 void PersistPanelExtrema(double currentProfit,double currentLots)
 {
    // In Strategy Tester, panel extrema belong to the current test run only.
@@ -35,9 +101,6 @@ void PersistPanelExtrema(double currentProfit,double currentLots)
       GlobalVariableSet(minKey,persistedMin);
    if(!GlobalVariableCheck(maxKey)||MathAbs(GlobalVariableGet(maxKey)-persistedMax)>0.0000001)
       GlobalVariableSet(maxKey,persistedMax);
-   // Deliberately no GlobalVariablesFlush() here. The terminal manages the
-   // persistence of terminal-global variables; explicit disk flush is reserved
-   // for forced live lifecycle checkpoints.
 }
 
 void LoadPersistedStrategicState()
@@ -51,11 +114,11 @@ void LoadPersistedStrategicState()
    if(GlobalVariableCheck(StateKey("g_r9HedgeActive")))g_r9HedgeActive=(GlobalVariableGet(StateKey("g_r9HedgeActive"))>0.5);
    if(GlobalVariableCheck(StateKey("PANEL_MIN_PROFIT")))g_panelMinProfit=GlobalVariableGet(StateKey("PANEL_MIN_PROFIT"));
    if(GlobalVariableCheck(StateKey("MAX_ACCUM_LOTS")))g_panelMaxLots=GlobalVariableGet(StateKey("MAX_ACCUM_LOTS"));
+   LoadPersistedR13State();
 }
 
 void PersistStrategicState(bool force=false)
 {
-   // Backtests are intentionally stateless with respect to terminal GVs.
    if(!EAGOLD_PersistenceEnabled())return;
 
    static bool initialized=false;
@@ -72,10 +135,9 @@ void PersistStrategicState(bool force=false)
    double worstStep=PersistenceWorstEquityStep;
    if(worstStep<0.0)worstStep=0.0;
    bool worstSignificant=(MathAbs(lastWorstPersisted-g_r10RecoveryWorstEquity)>=worstStep);
+   bool r13Changed=force||!initialized||MathAbs(g_r13RecoveryCapitalAvailable-GlobalVariableGet(StateKey("R13_LAST_AVAILABLE_CACHE")))>0.0000001||MathAbs(g_r13RecoveryCapitalUsed-GlobalVariableGet(StateKey("R13_LAST_USED_CACHE")))>0.0000001||MathAbs((double)g_r13LastEntry-GlobalVariableGet(StateKey("R13_LAST_ENTRY_CACHE")))>0.0000001;
 
-   // Important state transitions are persisted immediately. Worst-equity
-   // telemetry is checkpointed only after the configured material movement.
-   bool changed=force||!initialized||cycleChanged||startChanged||actionChanged||hedgeChanged||worstSignificant;
+   bool changed=force||!initialized||cycleChanged||startChanged||actionChanged||hedgeChanged||worstSignificant||r13Changed;
    if(!changed)return;
 
    GlobalVariableSet(StateKey("g_r10RecoveryCycleActive"),cycle);
@@ -83,6 +145,10 @@ void PersistStrategicState(bool force=false)
    GlobalVariableSet(StateKey("g_r10RecoveryWorstEquity"),g_r10RecoveryWorstEquity);
    GlobalVariableSet(StateKey("g_r10LastAction"),(double)g_r10LastAction);
    GlobalVariableSet(StateKey("g_r9HedgeActive"),hedge);
+   PersistR13State(force);
+   GlobalVariableSet(StateKey("R13_LAST_AVAILABLE_CACHE"),g_r13RecoveryCapitalAvailable);
+   GlobalVariableSet(StateKey("R13_LAST_USED_CACHE"),g_r13RecoveryCapitalUsed);
+   GlobalVariableSet(StateKey("R13_LAST_ENTRY_CACHE"),(double)g_r13LastEntry);
 
    initialized=true;
    lastCycle=cycle;
@@ -91,7 +157,6 @@ void PersistStrategicState(bool force=false)
    lastAction=(double)g_r10LastAction;
    lastHedge=hedge;
 
-   // Only forced live lifecycle checkpoints hit disk synchronously.
    if(force)GlobalVariablesFlush();
 }
 
