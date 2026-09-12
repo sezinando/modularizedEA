@@ -2,10 +2,16 @@
 #define EAGOLD_BRX_MQH
 
 //==================================================================
-// BRX v1.2 — TRANSACTIONAL BASKET REALIZATION ENGINE
+// BRX v1.3 — TRANSACTIONAL BASKET REALIZATION ENGINE
 // Realization is classified explicitly as BLOCKED / COMPLETED / PARTIAL / FAILED.
 // A realization is COMPLETED only when the requested market positions are fully
 // closed AND directional pending cleanup has been verified.
+//
+// ORCHESTRATION FIX v1.3:
+// A BIDIRECTIONAL realization attempt that is BLOCKED or FAILED does not consume
+// the BRX engine execution. The engine may continue to its DIRECTIONAL path.
+// PARTIAL/COMPLETED remain terminal for the current tick through the transaction
+// contract. Economic eligibility rules themselves are unchanged.
 //==================================================================
 
 double BRX_DirectionalProfit(int direction){return(DirectionBasketProfit(direction));}
@@ -88,8 +94,9 @@ bool BRX_Run(){
          int rc=0,cc=0;double rl=0.0,cl=0.0,realized=0.0;
          EAGOLD_ActionResult result=BRX_CloseBasketTransactional(rc,cc,rl,cl,realized);
          EAGOLD_ApplyActionResult(result,"BRX","BIDIRECTIONAL",HeavyDirection(),cl);
-         if(result==EAGOLD_ACTION_COMPLETED){EAGOLD_RealizationCascadeAdd(realized,CascadeEngineColor("BRX"));CreateEngineActionMarker("BRX","BIDIRECTIONAL",HeavyDirection(),0.0);Print(EA_NAME," BRX BIDIRECTIONAL COMPLETE: realized=",DoubleToString(realized,2));}
-         return(true);
+         if(result==EAGOLD_ACTION_COMPLETED){EAGOLD_RealizationCascadeAdd(realized,CascadeEngineColor("BRX"));CreateEngineActionMarker("BRX","BIDIRECTIONAL",HeavyDirection(),0.0);Print(EA_NAME," BRX BIDIRECTIONAL COMPLETE: realized=",DoubleToString(realized,2));return(true);}
+         if(result==EAGOLD_ACTION_PARTIAL){return(true);}
+         // BLOCKED/FAILED: do not consume BRX. Continue to DIRECTIONAL fallback.
       }
    }
    if(BRXRealizationMode==1||BRXRealizationMode==3){
