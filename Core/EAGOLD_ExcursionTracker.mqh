@@ -9,9 +9,9 @@
 // - MUST NOT submit, modify or close orders.
 // - MUST NOT change lot sizing, TP, BRX, R9, R10, R11 or R13 behavior.
 // - Tracks one EAGOLD master cycle from first order until the master
-//   universe becomes completely flat.
-// - MFE/MAE are measured from aggregate floating P/L of the EAGOLD
-//   master universe (positions only, including swap/commission).
+//   universe becomes completely flat (positions AND pending orders).
+// - MFE/MAE are measured from aggregate floating P/L of EAGOLD
+//   positions, including swap/commission.
 // - Final realized P/L is calculated from the broker history delta
 //   between cycle start and cycle end.
 //==================================================================
@@ -45,29 +45,16 @@ void EAGOLD_ExcursionEnsureFileHeader(int handle)
 {
    if(FileSize(handle)>0)return;
    FileWrite(handle,
-      "CYCLE_ID",
-      "START_TIME",
-      "END_TIME",
-      "DIRECTION",
-      "BUY_LOTS_MAX",
-      "SELL_LOTS_MAX",
-      "GROSS_LOTS_MAX",
-      "NET_LOTS_MAX",
-      "MFE",
-      "MAE",
-      "PEAK_FLOATING_PL",
-      "FINAL_REALIZED_PL",
-      "GIVEBACK",
-      "DURATION_SEC",
-      "REALIZATION_ENGINE",
-      "REALIZATION_TYPE");
+      "CYCLE_ID","START_TIME","END_TIME","DIRECTION",
+      "BUY_LOTS_MAX","SELL_LOTS_MAX","GROSS_LOTS_MAX","NET_LOTS_MAX",
+      "MFE","MAE","PEAK_FLOATING_PL","FINAL_REALIZED_PL","GIVEBACK",
+      "DURATION_SEC","REALIZATION_ENGINE","REALIZATION_TYPE");
 }
 
 void EAGOLD_ExcursionWriteRecord(datetime endTime)
 {
    int handle=FileOpen("EAGOLD_EXCURSION_CYCLES.csv",
-      FILE_CSV|FILE_READ|FILE_WRITE|FILE_SHARE_READ|FILE_SHARE_WRITE,
-      ';');
+      FILE_CSV|FILE_READ|FILE_WRITE|FILE_SHARE_READ|FILE_SHARE_WRITE,';');
    if(handle==INVALID_HANDLE)
    {
       Print("EAGOLD EXCURSION: FileOpen failed error=",GetLastError());
@@ -152,23 +139,23 @@ void EAGOLD_ExcursionTrackerStart(datetime now,double buyLots,double sellLots,do
 
 void EAGOLD_ExcursionTrackerObserve()
 {
-   double buyLots=DirectionLots(OP_BUY);
-   double sellLots=DirectionLots(OP_SELL);
-   int positions=CountDirectionPositions(OP_BUY)+CountDirectionPositions(OP_SELL);
-
-   if(positions<=0)
+   int masterOrders=CountEAGOLDOrders();
+   if(masterOrders<=0)
    {
       if(g_excursionActive)EAGOLD_ExcursionTrackerFinalize();
       return;
    }
 
+   double buyLots=DirectionLots(OP_BUY);
+   double sellLots=DirectionLots(OP_SELL);
    double floatingPL=DirectionBasketProfit(OP_BUY)+DirectionBasketProfit(OP_SELL);
    double grossLots=buyLots+sellLots;
    double netLots=MathAbs(buyLots-sellLots);
 
    if(!g_excursionActive)
    {
-      EAGOLD_ExcursionTrackerStart(TimeCurrent(),buyLots,sellLots,floatingPL);
+      if(CountDirectionPositions(OP_BUY)+CountDirectionPositions(OP_SELL)>0)
+         EAGOLD_ExcursionTrackerStart(TimeCurrent(),buyLots,sellLots,floatingPL);
       return;
    }
 
