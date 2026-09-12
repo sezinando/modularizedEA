@@ -1,6 +1,6 @@
 # EAGOLD — Audit Checkpoint: Transaction Contract & Economic Action Integrity
 
-**Version:** v1.1  
+**Version:** v1.2  
 **EA baseline:** EAGOLD v0.106  
 **Branch:** `main`  
 **Checkpoint date:** 2026-09-12  
@@ -14,7 +14,7 @@ This document is an audit checkpoint, not a LIVE approval and not a claim of run
 
 ## 2. Implemented transaction contract
 
-The core contract now defines:
+The core contract defines:
 
 ```text
 EAGOLD_ACTION_RESULT
@@ -68,7 +68,7 @@ No synthetic lot/ticket repair is performed.
 
 ## 5. R4/R5 lifecycle migration
 
-`Engines/EAGOLD_Lifecycle.mqh` now provides:
+`Engines/EAGOLD_Lifecycle.mqh` provides:
 
 `CloseDirectionPositionsTransactional()`
 
@@ -76,13 +76,13 @@ with explicit `BLOCKED`, `COMPLETED`, `PARTIAL`, and `FAILED` outcomes.
 
 The legacy `CloseDirectionPositionsRobust()` remains as a compatibility wrapper and returns `true` only for a fully completed close.
 
-`BuyBasketCloseTransactional()` and `SellBasketCloseTransactional()` now propagate transaction outcomes and request reconciliation after partial basket closure.
+`BuyBasketCloseTransactional()` and `SellBasketCloseTransactional()` propagate transaction outcomes and request reconciliation after partial basket closure.
 
 The BUY/SELL machines stop their remaining economic actions when the basket operation is `PARTIAL`. A completed basket close does not fall through to recovery on the same direction path.
 
 ## 6. Pending cleanup is now transactional
 
-`CloseAllDirectionPending()` now returns `bool` and verifies that no EAGOLD pending order of the direction remains after deletion attempts.
+`CloseAllDirectionPending()` returns `bool` and verifies that no EAGOLD pending order of the direction remains after deletion attempts.
 
 R4 single-TP reentry therefore follows:
 
@@ -95,31 +95,59 @@ close market position
 
 If cleanup or replacement creation fails after an economic close, the action is treated as incomplete and reconciliation is requested. The code does not blindly create a replacement while an old pending may still exist.
 
-## 7. R13 finding remains open
+## 7. R13 transactional migration v1.0 — IMPLEMENTED
 
-`R13CloseAll()` and the R13 recovery-capital lifecycle have not yet been migrated to the same transactional result contract.
+`Engines/EAGOLD_R13_Satellite.mqh` has been migrated from boolean `changed` semantics to the transaction contract.
 
-The known risk remains:
+`R13CloseAllTransactional()` now:
+
+1. captures the Satellite ticket set before mutation;
+2. records requested position count and requested lots;
+3. attempts each close independently;
+4. records completed positions/lots and realized P/L;
+5. verifies the postcondition `R13CountOwnPositions()==0`;
+6. returns `COMPLETED` only when every requested Satellite position is closed and the postcondition is true;
+7. returns `PARTIAL` when any economic close succeeded but Satellite exposure remains or another close failed;
+8. returns `FAILED` when no close succeeds;
+9. returns `BLOCKED` when there is no closeable Satellite position.
+
+On `PARTIAL`, `EAGOLD_ApplyActionResult()` requests reconciliation and the current economic tick is consumed/blocked according to the action contract. R13 does not reopen the Satellite or continue to another economic action on that tick.
+
+Most importantly, **R13 recovery capital is not released on PARTIAL or FAILED exits**. `R13AddRecoveryCapital()` is called only after a fully completed Satellite exit.
+
+## 8. R13 -> R10 funding sequence
+
+R13 Master adjustment is now mediated by `R13TryFundMasterAdjustmentTransactional()`.
+
+The sequence is intentionally separated across ticks:
 
 ```text
-one Satellite ticket closes
-  -> R13 may interpret `changed=true`
-  -> capital may be released
-  -> another Satellite ticket may remain exposed
+R13 exit COMPLETED
+  -> realize profit
+  -> add eligible recovery capital
+  -> CONSUME current tick
+
+next tick
+  -> attempt R13 -> R10 adjustment
+  -> verify Master exposure decreased
+  -> consume capital only for observed broker-side reduction
+  -> PARTIAL/FAILED blocks further economic progression when applicable
 ```
 
-R13 remains a HIGH / PRE-LIVE BLOCK item until migrated and runtime-tested.
+The adapter also detects a legacy R10 false-negative when broker-visible Master exposure decreased, preventing the old `false == no action` interpretation from propagating into R13.
 
-## 8. Persistence gap remains open
+The R10 implementation itself still contains legacy boolean internals and remains a separate consolidation target.
+
+## 9. Persistence gap remains open
 
 R13 recovery capital state is still not persisted:
 
 - `g_r13RecoveryCapitalAvailable`
 - `g_r13RecoveryCapitalUsed`
 
-This remains an economic continuity gap across EA restart.
+This remains an economic continuity gap across EA restart and is still a PRE-LIVE item.
 
-## 9. R10 implementation duplication remains open
+## 10. R10 implementation duplication remains open
 
 Two R10 concepts still exist:
 
@@ -128,22 +156,22 @@ Two R10 concepts still exist:
 
 This remains architectural debt until the authoritative R10 implementation is consolidated.
 
-## 10. Current invariant status
+## 11. Current invariant status
 
 | Invariant | Status |
 |---|---|
 | I1 — reduction must not increase exposure | GREEN static / runtime pending |
-| I2 — PARTIAL != NO_ACTION | GREEN static for R10/R5 paths / runtime pending |
+| I2 — PARTIAL != NO_ACTION | GREEN static for R10/R5/R13 paths / runtime pending |
 | I3 — one realized event must not fund two reductions | NOT YET PROVEN |
-| I4 — realized capital consumed once | NOT YET PROVEN |
+| I4 — realized capital consumed once | IMPROVED static / runtime not proven |
 | I5 — R10 cannot create exposure | GREEN static |
 | I6 — R7 cannot recreate during incomplete transaction | IMPROVED / runtime pending |
-| I7 — Satellite exits when Master is flat | RED |
+| I7 — Satellite exits when Master is flat | GREEN static / runtime pending |
 | I8 — persistence must not lose economic state | ORANGE/RED for R13 capital |
 | I9 — ticket cannot be counted twice | GREEN static / runtime pending |
 | I10 — material actions emit auditable events | ORANGE / complete call-site audit pending |
 
-## 11. Runtime status
+## 12. Runtime status
 
 The implementation has not been certified by controlled MT4 Strategy Tester/Journal evidence.
 
@@ -157,19 +185,25 @@ Still required:
 - BRX runtime matrix completion;
 - R9 runtime regression;
 - R11 runtime regression;
-- R13 runtime lifecycle/partial-close scenarios.
+- R13 runtime lifecycle/partial-close scenarios;
+- R13 restart/persistence scenario.
 
 No runtime PASS is claimed by this checkpoint.
 
-## 12. Gate decision
+## 13. Gate decision
 
 **PRE-LIVE BLOCK remains active.**
 
-The transaction-contract implementation reduces the identified same-tick fall-through risk but does not authorize LIVE operation.
+The transaction-contract implementation materially reduces the identified same-tick fall-through and false-negative risks, but does not authorize LIVE operation.
 
-## 13. Next audit step
+## 14. Next audit step
 
-The next high-priority implementation is the R13 transactional migration, followed by the full broker-action call-site audit and runtime validation matrix.
+Next priority:
+
+1. R13 recovery-capital persistence and restart continuity;
+2. full broker-action call-site audit;
+3. R10 legacy/formal implementation consolidation;
+4. controlled runtime validation matrix.
 
 The target map remains:
 
