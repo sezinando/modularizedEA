@@ -308,18 +308,44 @@ void R13AddRecoveryCapital(double realized){
    Print(EA_NAME," R13 RECOVERY CAPITAL: realized=$",DoubleToString(realized,2)," added=$",DoubleToString(added,2)," available=$",DoubleToString(g_r13RecoveryCapitalAvailable,2));
 }
 
-void R13TryFundMasterAdjustment(){
-   if(!EnableR13MasterAdjustment||g_r13RecoveryCapitalAvailable<=0.0)return;
-   double exposure=ExposureLots();
-   if(exposure<R13MinDirectionalImbalance)return;
+EAGOLD_ActionResult R13TryFundMasterAdjustmentTransactional(double &usedCapital,double &reducedLots,double &realizedLoss){
+   usedCapital=0.0;
+   reducedLots=0.0;
+   realizedLoss=0.0;
+   if(!EnableR13MasterAdjustment||g_r13RecoveryCapitalAvailable<=0.0)return(EAGOLD_ACTION_BLOCKED);
+
+   double exposureBefore=ExposureLots();
+   if(exposureBefore<R13MinDirectionalImbalance)return(EAGOLD_ACTION_BLOCKED);
    int masterDirection=HeavyDirection();
-   if(masterDirection<0)return;
-   double used=0.0,reduced=0.0,loss=0.0;
-   if(R10ProfitFundedAverageAdjustment(masterDirection,g_r13RecoveryCapitalAvailable,R13MasterAdjustmentMaxLots,used,reduced,loss)){
-      g_r13RecoveryCapitalAvailable=MathMax(0.0,g_r13RecoveryCapitalAvailable-used);
-      g_r13RecoveryCapitalUsed+=used;
-      Print(EA_NAME," R13 -> R10 CAPITAL CONSUMED: side=",(masterDirection==OP_BUY?"BUY":"SELL")," reduced=",DoubleToString(reduced,DigitsLots)," loss=$",DoubleToString(MathAbs(loss),2)," used=$",DoubleToString(used,2)," remaining=$",DoubleToString(g_r13RecoveryCapitalAvailable,2));
+   if(masterDirection<0)return(EAGOLD_ACTION_BLOCKED);
+
+   bool completed=R10ProfitFundedAverageAdjustment(masterDirection,g_r13RecoveryCapitalAvailable,R13MasterAdjustmentMaxLots,usedCapital,reducedLots,realizedLoss);
+   double exposureAfter=ExposureLots();
+
+   if(completed){
+      if(reducedLots<Lot||exposureAfter>=exposureBefore-0.00001){
+         Print(EA_NAME," R13 -> R10 ADAPTER POSTCONDITION FAILED: expected exposure reduction. before=",DoubleToString(exposureBefore,DigitsLots)," after=",DoubleToString(exposureAfter,DigitsLots));
+         if(exposureAfter<exposureBefore-0.00001)return(EAGOLD_ACTION_PARTIAL);
+         return(EAGOLD_ACTION_FAILED);
+      }
+      g_r13RecoveryCapitalAvailable=MathMax(0.0,g_r13RecoveryCapitalAvailable-usedCapital);
+      g_r13RecoveryCapitalUsed+=usedCapital;
+      Print(EA_NAME," R13 -> R10 CAPITAL CONSUMED: side=",(masterDirection==OP_BUY?"BUY":"SELL")," reduced=",DoubleToString(reducedLots,DigitsLots)," loss=$",DoubleToString(MathAbs(realizedLoss),2)," used=$",DoubleToString(usedCapital,2)," remaining=$",DoubleToString(g_r13RecoveryCapitalAvailable,2));
+      return(EAGOLD_ACTION_COMPLETED);
    }
+
+   // R10's legacy boolean API can return false after an economic partial.
+   // Infer that condition from the broker-visible exposure delta and stop.
+   if(exposureAfter<exposureBefore-0.00001){
+      Print(EA_NAME," R13 -> R10 ADAPTER PARTIAL: exposure reduced despite false legacy result. before=",DoubleToString(exposureBefore,DigitsLots)," after=",DoubleToString(exposureAfter,DigitsLots)," used=$",DoubleToString(usedCapital,2));
+      if(usedCapital>0.0){
+         g_r13RecoveryCapitalAvailable=MathMax(0.0,g_r13RecoveryCapitalAvailable-usedCapital);
+         g_r13RecoveryCapitalUsed+=usedCapital;
+      }
+      return(EAGOLD_ACTION_PARTIAL);
+   }
+
+   return(EAGOLD_ACTION_FAILED);
 }
 
 void R13ManageOpenPositions(int masterDirection,double masterExposure){
@@ -334,11 +360,8 @@ void R13ManageOpenPositions(int masterDirection,double masterExposure){
       int requestedCount=0,completedCount=0;
       double requestedLots=0.0,completedLots=0.0,realized=0.0;
       EAGOLD_ActionResult result=R13CloseAllTransactional("MASTER_FLAT",requestedCount,completedCount,requestedLots,completedLots,realized);
-      EAGOLD_ApplyActionResult(result,"R13","MASTER_FLAT",R13OwnDirection(),completedLots);
-      if(result==EAGOLD_ACTION_COMPLETED){
-         R13AddRecoveryCapital(realized);
-         return;
-      }
+      EAGOLD_ApplyActionResult(result,"R13","MASTER_FLAT",ownDirection,completedLots);
+      if(result==EAGOLD_ACTION_COMPLETED)R13AddRecoveryCapital(realized);
       return;
    }
 
@@ -347,10 +370,7 @@ void R13ManageOpenPositions(int masterDirection,double masterExposure){
       double requestedLots=0.0,completedLots=0.0,realized=0.0;
       EAGOLD_ActionResult result=R13CloseAllTransactional("MASTER_DIRECTION_CHANGED",requestedCount,completedCount,requestedLots,completedLots,realized);
       EAGOLD_ApplyActionResult(result,"R13","MASTER_DIRECTION_CHANGED",ownDirection,completedLots);
-      if(result==EAGOLD_ACTION_COMPLETED){
-         R13AddRecoveryCapital(realized);
-         return;
-      }
+      if(result==EAGOLD_ACTION_COMPLETED)R13AddRecoveryCapital(realized);
       return;
    }
 
@@ -359,10 +379,7 @@ void R13ManageOpenPositions(int masterDirection,double masterExposure){
       double requestedLots=0.0,completedLots=0.0,realized=0.0;
       EAGOLD_ActionResult result=R13CloseAllTransactional("R13_PROFIT_TARGET",requestedCount,completedCount,requestedLots,completedLots,realized);
       EAGOLD_ApplyActionResult(result,"R13","R13_PROFIT_TARGET",ownDirection,completedLots);
-      if(result==EAGOLD_ACTION_COMPLETED){
-         R13AddRecoveryCapital(realized);
-         return;
-      }
+      if(result==EAGOLD_ACTION_COMPLETED)R13AddRecoveryCapital(realized);
       return;
    }
 }
@@ -417,6 +434,16 @@ void R13Observe(R13ObserverState &state){
    state.reason=state.eligible?"ELIGIBLE_MASTER_EXPOSURE":"MASTER_OR_LIMIT_GATE";
 
    if(state.tradingEnabled){
+      // Recovery capital can only be consumed by R10 on a later tick, after
+      // a prior R13 exit was fully completed and its broker state reconciled.
+      double usedCapital=0.0,reducedLots=0.0,realizedLoss=0.0;
+      EAGOLD_ActionResult funding=R13TryFundMasterAdjustmentTransactional(usedCapital,reducedLots,realizedLoss);
+      if(funding!=EAGOLD_ACTION_BLOCKED){
+         EAGOLD_ApplyActionResult(funding,"R13","R10_MASTER_ADJUST",state.masterDirection,reducedLots);
+         if(funding!=EAGOLD_ACTION_COMPLETED)return;
+         return;
+      }
+
       R13ManageOpenPositions(state.masterDirection,state.masterExposureLots);
       // A transactional exit consumes this tick. Do not reopen the Satellite
       // or launch a downstream R10 adjustment on the same tick.
