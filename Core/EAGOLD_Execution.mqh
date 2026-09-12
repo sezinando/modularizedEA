@@ -19,6 +19,21 @@ int SendMarket(int type,double lots,string comment)
 bool CloseMarketOrder(int ticket){if(!OrderSelect(ticket,SELECT_BY_TICKET,MODE_TRADES))return(false);if(!IsEAGOLDOrder())return(false);int type=OrderType();if(type!=OP_BUY&&type!=OP_SELL)return(false);RefreshRates();double price=(type==OP_BUY?Bid:Ask);ResetLastError();if(!OrderClose(ticket,OrderLots(),NormalizePrice(price),0,clrNONE)){Print(EA_NAME," market close failed. ticket=",ticket," error=",GetLastError());return(false);}return(true);}
 bool CloseMarketOrderLots(int ticket,double lots,double &realized){realized=0.0;if(!OrderSelect(ticket,SELECT_BY_TICKET,MODE_TRADES))return(false);if(!IsEAGOLDOrder())return(false);int type=OrderType();if(type!=OP_BUY&&type!=OP_SELL)return(false);double available=OrderLots();double closeLots=NormalizeDouble(MathMin(lots,available),DigitsLots);if(closeLots<Lot)return(false);RefreshRates();double price=(type==OP_BUY?Bid:Ask);ResetLastError();if(!OrderClose(ticket,closeLots,NormalizePrice(price),0,clrNONE)){Print(EA_NAME," partial close failed. ticket=",ticket," lots=",DoubleToString(closeLots,DigitsLots)," error=",GetLastError());return(false);}if(OrderSelect(ticket,SELECT_BY_TICKET,MODE_HISTORY))realized=OrderProfit()+OrderSwap()+OrderCommission();return(true);}
 bool DeletePendingOrder(int ticket){if(!OrderSelect(ticket,SELECT_BY_TICKET,MODE_TRADES))return(false);if(!IsEAGOLDOrder())return(false);int type=OrderType();if(type!=OP_BUYSTOP&&type!=OP_SELLSTOP)return(false);ResetLastError();if(!OrderDelete(ticket)){Print(EA_NAME," pending delete failed. ticket=",ticket," error=",GetLastError());return(false);}return(true);}
-void CloseAllDirectionPending(int direction){int type=(direction==OP_BUY?OP_BUYSTOP:OP_SELLSTOP);for(int i=OrdersTotal()-1;i>=0;i--){if(!OrderSelect(i,SELECT_BY_POS,MODE_TRADES))continue;if(!IsEAGOLDOrder()||OrderType()!=type)continue;DeletePendingOrder(OrderTicket());}}
+
+bool CloseAllDirectionPending(int direction)
+{
+   int type=(direction==OP_BUY?OP_BUYSTOP:OP_SELLSTOP);
+   bool allDeleted=true;
+   for(int i=OrdersTotal()-1;i>=0;i--)
+   {
+      if(!OrderSelect(i,SELECT_BY_POS,MODE_TRADES))continue;
+      if(!IsEAGOLDOrder()||OrderType()!=type)continue;
+      if(!DeletePendingOrder(OrderTicket()))
+         allDeleted=false;
+   }
+   if(CountDirectionPending(direction)>0)
+      allDeleted=false;
+   return(allDeleted);
+}
 
 #endif
