@@ -1,6 +1,6 @@
 # EAGOLD — Audit Checkpoint: Transaction Contract & Economic Action Integrity
 
-**Version:** v1.2  
+**Version:** v1.3  
 **EA baseline:** EAGOLD v0.106  
 **Branch:** `main`  
 **Checkpoint date:** 2026-09-12  
@@ -8,7 +8,7 @@
 
 ## 1. Purpose
 
-This checkpoint records the implementation stage of the EAGOLD transaction-contract audit. The objective is to prevent partial broker execution from being interpreted as no action and to force broker-state reconciliation before subsequent economic actions.
+This checkpoint records the implementation stage of the EAGOLD transaction-contract audit. The objective is to prevent partial broker execution from being interpreted as no action, force broker-state reconciliation before subsequent economic actions, and preserve non-reconstructible economic state across EA restart.
 
 This document is an audit checkpoint, not a LIVE approval and not a claim of runtime validation.
 
@@ -45,7 +45,7 @@ PARTIAL
 
 ## 3. R10 implementation status
 
-R10 now classifies partial pair/balanced reduction outcomes and requests reconciliation when economic state changed without full completion. The EA tick policy blocks subsequent economic engines after `PARTIAL`.
+R10 classifies partial pair/balanced reduction outcomes and requests reconciliation when economic state changed without full completion. The EA tick policy blocks subsequent economic engines after `PARTIAL`.
 
 A persistent MT4 Global Variable is used as the reconciliation-required boundary, keyed by account, symbol and MagicNumber. On the next tick, the reconciliation module performs a fresh broker-visible census and only clears the barrier after the census is valid.
 
@@ -68,11 +68,7 @@ No synthetic lot/ticket repair is performed.
 
 ## 5. R4/R5 lifecycle migration
 
-`Engines/EAGOLD_Lifecycle.mqh` provides:
-
-`CloseDirectionPositionsTransactional()`
-
-with explicit `BLOCKED`, `COMPLETED`, `PARTIAL`, and `FAILED` outcomes.
+`Engines/EAGOLD_Lifecycle.mqh` provides `CloseDirectionPositionsTransactional()` with explicit `BLOCKED`, `COMPLETED`, `PARTIAL`, and `FAILED` outcomes.
 
 The legacy `CloseDirectionPositionsRobust()` remains as a compatibility wrapper and returns `true` only for a fully completed close.
 
@@ -80,7 +76,7 @@ The legacy `CloseDirectionPositionsRobust()` remains as a compatibility wrapper 
 
 The BUY/SELL machines stop their remaining economic actions when the basket operation is `PARTIAL`. A completed basket close does not fall through to recovery on the same direction path.
 
-## 6. Pending cleanup is now transactional
+## 6. Pending cleanup is transactional
 
 `CloseAllDirectionPending()` returns `bool` and verifies that no EAGOLD pending order of the direction remains after deletion attempts.
 
@@ -99,7 +95,7 @@ If cleanup or replacement creation fails after an economic close, the action is 
 
 `Engines/EAGOLD_R13_Satellite.mqh` has been migrated from boolean `changed` semantics to the transaction contract.
 
-`R13CloseAllTransactional()` now:
+`R13CloseAllTransactional()`:
 
 1. captures the Satellite ticket set before mutation;
 2. records requested position count and requested lots;
@@ -111,13 +107,11 @@ If cleanup or replacement creation fails after an economic close, the action is 
 8. returns `FAILED` when no close succeeds;
 9. returns `BLOCKED` when there is no closeable Satellite position.
 
-On `PARTIAL`, `EAGOLD_ApplyActionResult()` requests reconciliation and the current economic tick is consumed/blocked according to the action contract. R13 does not reopen the Satellite or continue to another economic action on that tick.
-
-Most importantly, **R13 recovery capital is not released on PARTIAL or FAILED exits**. `R13AddRecoveryCapital()` is called only after a fully completed Satellite exit.
+Recovery capital is released only after `COMPLETED`. `PARTIAL` and `FAILED` do not release capital and request the existing reconciliation barrier through the action contract.
 
 ## 8. R13 -> R10 funding sequence
 
-R13 Master adjustment is now mediated by `R13TryFundMasterAdjustmentTransactional()`.
+R13 Master adjustment is mediated by `R13TryFundMasterAdjustmentTransactional()`.
 
 The sequence is intentionally separated across ticks:
 
@@ -134,20 +128,34 @@ next tick
   -> PARTIAL/FAILED blocks further economic progression when applicable
 ```
 
-The adapter also detects a legacy R10 false-negative when broker-visible Master exposure decreased, preventing the old `false == no action` interpretation from propagating into R13.
+The adapter also detects a legacy R10 false-negative when broker-visible Master exposure decreased.
 
-The R10 implementation itself still contains legacy boolean internals and remains a separate consolidation target.
+## 9. R13 recovery-capital persistence — IMPLEMENTED STATICALLY
 
-## 9. Persistence gap remains open
+`Core/EAGOLD_Persistence.mqh` now persists:
 
-R13 recovery capital state is still not persisted:
+- `g_r13RecoveryCapitalAvailable`;
+- `g_r13RecoveryCapitalUsed`;
+- `g_r13LastEntry`.
 
-- `g_r13RecoveryCapitalAvailable`
-- `g_r13RecoveryCapitalUsed`
+The R13 state uses a two-slot snapshot:
 
-This remains an economic continuity gap across EA restart and is still a PRE-LIVE item.
+```text
+inactive slot
+  -> write version
+  -> write available
+  -> write used
+  -> write last entry
+  -> commit slot LAST
+```
 
-## 10. R10 implementation duplication remains open
+On restart, only the committed slot is restored. If no valid committed snapshot exists, the R13 capital state starts at zero rather than trusting incomplete data.
+
+Strategy Tester remains intentionally isolated from terminal Global Variables, preserving clean in-memory test runs.
+
+The EA include order was adjusted so R13 state exists before the persistence module accesses it.
+
+## 10. Remaining architectural debt
 
 Two R10 concepts still exist:
 
@@ -162,12 +170,12 @@ This remains architectural debt until the authoritative R10 implementation is co
 |---|---|
 | I1 — reduction must not increase exposure | GREEN static / runtime pending |
 | I2 — PARTIAL != NO_ACTION | GREEN static for R10/R5/R13 paths / runtime pending |
-| I3 — one realized event must not fund two reductions | NOT YET PROVEN |
+| I3 — one realized event must not fund two reductions | IMPROVED static / runtime not proven |
 | I4 — realized capital consumed once | IMPROVED static / runtime not proven |
 | I5 — R10 cannot create exposure | GREEN static |
 | I6 — R7 cannot recreate during incomplete transaction | IMPROVED / runtime pending |
 | I7 — Satellite exits when Master is flat | GREEN static / runtime pending |
-| I8 — persistence must not lose economic state | ORANGE/RED for R13 capital |
+| I8 — persistence must not lose economic state | GREEN static for R13 snapshot design / restart runtime pending |
 | I9 — ticket cannot be counted twice | GREEN static / runtime pending |
 | I10 — material actions emit auditable events | ORANGE / complete call-site audit pending |
 
@@ -194,28 +202,35 @@ No runtime PASS is claimed by this checkpoint.
 
 **PRE-LIVE BLOCK remains active.**
 
-The transaction-contract implementation materially reduces the identified same-tick fall-through and false-negative risks, but does not authorize LIVE operation.
+The static transaction-contract and persistence work materially reduces the identified economic-integrity risks, but does not authorize LIVE operation.
 
 ## 14. Next audit step
 
-Next priority:
-
-1. R13 recovery-capital persistence and restart continuity;
-2. full broker-action call-site audit;
-3. R10 legacy/formal implementation consolidation;
-4. controlled runtime validation matrix.
-
-The target map remains:
+Next priority is no longer a new trading feature. It is the **full broker-action call-site audit**:
 
 ```text
+OrderSend
+OrderClose
+OrderCloseLots
+OrderDelete
+   ↓
 CALL SITE
- -> ENGINE
- -> ACTION
- -> RESULT SEMANTICS
- -> BROKER STATE CHANGE
- -> REALIZED P/L
- -> EVENT
- -> PERSISTENCE
- -> TICK CONSUMPTION
- -> NEXT ENGINE
+   ↓
+ENGINE
+   ↓
+RESULT SEMANTICS
+   ↓
+BROKER STATE CHANGE
+   ↓
+REALIZED P/L
+   ↓
+EVENT
+   ↓
+PERSISTENCE
+   ↓
+TICK CONSUMPTION
+   ↓
+NEXT ENGINE
 ```
+
+After the call-site audit, consolidate the authoritative R10 implementation and then execute the controlled runtime validation matrix.
