@@ -19,101 +19,129 @@ Nenhuma realização deve ser considerada validada apenas porque o resultado flu
 
 Não existe garantia matemática de lucro após execução de mercado. O objetivo operacional é impedir que a decisão de fechamento seja autorizada quando o resultado projetado já estiver abaixo do piso definido.
 
-## 3. Achado crítico identificado na implementação atual
+## 3. Achado crítico anterior — STATUS CORRIGIDO
 
-O BRX possui proteção explícita em `BRX_CloseBasket()` e `BRX_CloseDirection()`, utilizando `profit >= floor + safety buffer` antes da autorização. Entretanto, o caminho posterior `BuyBasketClose()` / `SellBasketClose()` do Lifecycle utiliza `BRXDirectionalMinProfit` como alvo, mas não adiciona `BRXRealizationSafetyBuffer` ao teste de fechamento.
+A versão anterior deste documento registrava um bypass potencial no caminho `BuyBasketClose()` / `SellBasketClose()` do Lifecycle: o fechamento poderia usar apenas `BRXDirectionalMinProfit`, sem acrescentar `BRXRealizationSafetyBuffer`.
 
-Consequentemente, existe um caminho potencial de fechamento direcional que pode exigir apenas o piso nominal e não o piso nominal acrescido do buffer.
-
-Esse achado deve ser tratado como **CRITICAL — PRE-LIVE BLOCK** até ser corrigido ou formalmente demonstrado como inalcançável no fluxo de produção.
-
-## 4. Interação observada
-
-O fluxo atual de `BuyMachine()` e `SellMachine()` executa primeiro `BRX_Run()` apenas em determinados modos e, se ele não realizar a cesta, continua para `BuyBasketClose()` / `SellBasketClose()`.
-
-Portanto, a existência de uma proteção em `BRX_Run()` não é suficiente para provar que todos os caminhos posteriores possuem a mesma proteção.
-
-## 5. Critério de correção recomendado
-
-Quando `EnableBasketRealization=true` e `BRXRealizationMode!=0`, qualquer fechamento direcional executado pelo Lifecycle deve respeitar o mesmo contrato mínimo do BRX:
+A implementação atual foi corrigida. Quando BRX está ativo, `BuyBasketClose()` e `SellBasketClose()` utilizam:
 
 `required = BRXDirectionalMinProfit + max(0, BRXRealizationSafetyBuffer)`
 
-Além disso, quando `BRXRequireWeightedBE=true`, deve permanecer obrigatório o teste de weighted BE correspondente ao buffer configurado.
+O teste de weighted BE também permanece aplicado quando `BRXRequireWeightedBE=true`.
 
-O caminho legacy (`BRXRealizationMode=0` ou `EnableBasketRealization=false`) não deve receber essa regra BRX, preservando o contrato legacy.
+**Conclusão de código:** o achado de bypass nominal identificado anteriormente não permanece no código atual. A correção precisa continuar sendo validada em runtime, portanto isso não equivale a aprovação LIVE.
 
-## 6. Testes obrigatórios após a correção
+## 4. Proteção do BRX atual
 
-### T-BRX-01 — piso nominal
+`BRX_CloseDirection()` e `BRX_CloseBasket()` exigem o piso protegido antes da autorização.
 
-Configuração:
-- `BRXDirectionalMinProfit = 5`
-- `BRXRealizationSafetyBuffer = 5`
+No modo bidirecional, a execução é sequencial por perna. Depois da primeira perna, o código mede o resultado efetivamente realizado e impede a segunda perna quando o resultado realizado/projetado não preserva o piso nominal. A contabilização utiliza `OrderProfit()+OrderSwap()+OrderCommission()` das ordens efetivamente fechadas.
 
-Cenário: resultado direcional entre 5 e 10.
+Essa arquitetura reduz o risco de decisão baseada somente no P/L flutuante, mas não fornece garantia matemática contra slippage, rejeição ou mudança de preço entre as execuções. O teste de runtime continua obrigatório.
 
-Esperado: **HOLD**.
+## 5. Evidência de runtime — `Avaliacao= BRX.log`
 
-### T-BRX-02 — piso protegido
+A execução fornecida contém evidência do modo bidirecional no baseline de teste:
 
-Mesmo cenário com resultado acima de 10.
+### Caso observado 01 — 01:45:18
 
-Esperado: fechamento elegível, sujeito aos demais guards.
+- BUY realizado: `6.69`
+- SELL realizado: `3.80`
+- total realizado: `10.49`
+- piso nominal: `5.00`
+- autorização protegida: `10.00`
+- fechamento bidirecional completo confirmado.
+- após ficar flat, o ciclo foi recriado por R1 (`R1 FIRST BUY/SELL`).
 
-### T-BRX-03 — buffer zero
+### Caso observado 02 — 02:09:39
 
-`BRXRealizationSafetyBuffer = 0`.
+- BUY realizado: `5.10`
+- SELL realizado: `5.02`
+- total realizado: `10.12`
+- piso nominal: `5.00`
+- autorização protegida: `10.00`
+- fechamento bidirecional completo confirmado.
+- após ficar flat, o ciclo foi recriado por R1.
 
-Esperado: comportamento equivalente ao piso nominal, sem cushion adicional.
+Esses casos sustentam **PASS observado para o limite protegido T-BRX-02**, mas não comprovam o cenário de HOLD entre `5` e `10`.
 
-### T-BRX-04 — weighted BE
+Também foram observados fechamentos direcionais acima do piso protegido, mas os registros direcionais não imprimem explicitamente `requiredAuthorization`. Por isso, eles não devem ser usados isoladamente como prova do enforcement do buffer.
 
-`BRXRequireWeightedBE = true` e buffer positivo.
+## 6. Classificação atual dos testes BRX
 
-Esperado: realização somente quando o weighted BE estiver protegido pelo buffer configurado.
+| Teste | Status | Evidência / pendência |
+|---|---|---|
+| T-BRX-01 | NOT RUN | Ainda falta um caso inequívoco entre `5` e `10` com BRX HOLD e ausência de fechamento naquele tick/ciclo. |
+| T-BRX-02 | PASS observado | Casos bidirecionais `10.49` e `10.12`, com `requiredAuthorization=10.00` e `realizedActual` correspondente. |
+| T-BRX-03 | NOT RUN | Repetir com `BRXRealizationSafetyBuffer=0`. |
+| T-BRX-04 | NOT RUN | Repetir com weighted BE habilitado e buffer positivo. |
+| T-BRX-05 | NOT RUN | Validar interação R10 → BRX e resultado econômico completo do ciclo. |
+| T-BRX-06 | NOT RUN | Validar interação R10.2 → BRX. |
 
-### T-BRX-05 — R10 antes de BRX
+## 7. Qualidade da evidência atual
 
-Executar redução R10, registrar todo resultado realizado e depois provocar condição de realização.
+O log analisado é uma **execução de integração**, não uma bateria estéril de BRX: havia mecanismos de Recovery/R11 ativos no cenário relevante. Portanto, ele é válido para observar interação real do fluxo, mas não substitui os testes controlados da matriz.
 
-Registrar:
-- equity inicial do ciclo;
-- pior equity;
-- resultado realizado por R10;
-- resultado flutuante restante;
-- custos;
-- resultado econômico acumulado;
-- decisão BRX;
-- resultado final após fechamento.
+O tester foi interrompido manualmente. As operações de encerramento provocadas pela parada não devem ser usadas como P/L natural de fim de período.
 
-### T-BRX-06 — R10.2 ativo
+Não foi identificada evidência textual de erro `4109` no log analisado; essa busca não constitui prova de ausência de todos os erros de execução.
 
-Repetir T-BRX-05 com `EnableR10RecoveryRealization=true`.
+## 8. Interação BRX → Lifecycle confirmada
 
-Esperado: R10.2 continua sendo um guard independente e não pode ser bypassado por outro caminho de fechamento.
+Quando o BRX bidirecional fecha completamente a cesta e deixa o Master flat, `CreateFirstOrdersIfFlat()` recria as sementes R1. O fluxo observado foi:
 
-## 7. Gate econômico de aprovação
+`BRX BIDIRECTIONAL CLOSE COMPLETE → MASTER FLAT → R1 FIRST BUY/SELL`
+
+Não foi observado R7 como mecanismo de restart imediatamente após esse fechamento bidirecional.
+
+Isso é consistente com a arquitetura atual: `BRX_Run()` encerra o ciclo de fechamento e `CreateFirstOrdersIfFlat()` trata o estado global flat posteriormente.
+
+## 9. Pendências de auditoria identificadas no código
+
+### 9.1 R10 partial execution
+
+`Rule10ProfitFundedPartial()` e `Rule10Reduce()` são sequenciais. Se uma perna da redução for executada e a segunda falhar, o estado fica parcialmente alterado. O código registra a ocorrência e retorna `false`, mas a máquina pode continuar para caminhos posteriores no mesmo `OnTick` dependendo do fluxo.
+
+Isso exige teste específico de falha parcial antes de LIVE, principalmente quando BRX estiver ativo.
+
+### 9.2 `R10MarkerFont`
+
+O input existe, mas `CreateR10VisualMarker()` utiliza o font hardcoded `"Segoe UI Semibold"`. O input deve permanecer classificado como **INATIVO** até eventual correção deliberada.
+
+### 9.3 Engine Action Marker
+
+A implementação atual utiliza `OBJ_ARROW` com código `159` e cor derivada do engine. Os antigos inputs de font/tamanho/background não controlam o objeto visual atual e devem permanecer classificados como inativos.
+
+### 9.4 Performance
+
+`OnTick()` atualiza painel, cascade, chart guides e persistência a cada tick. A persistência live foi condicionada a mudanças significativas, mas ainda existem operações gráficas por tick que devem ser consideradas na próxima auditoria de performance. Não atribuir a lentidão exclusivamente à persistência sem benchmark isolado.
+
+## 10. Gate econômico de aprovação
 
 O bloco BRX/R10/R10.2 somente poderá ser marcado como `LIVE-VALIDATED` quando:
 
 - nenhum caminho de fechamento bypassar o safety buffer quando BRX estiver ativo;
+- T-BRX-01 a T-BRX-06 forem `PASS` ou formalmente `NOT APPLICABLE`;
 - R10 e BRX forem avaliados no mesmo ciclo econômico;
 - fechamentos parciais forem contabilizados no resultado do ciclo;
 - custos forem incluídos na evidência;
-- todos os testes T-BRX-01 a T-BRX-06 forem `PASS` ou formalmente `NOT APPLICABLE`;
+- falhas parciais de execução forem testadas;
 - o commit exato do EA e o hash do `.set` estiverem registrados.
 
-## 8. Decisão atual
+## 11. Decisão atual
 
 **STATUS: PRE-LIVE BLOCK.**
 
-Não alterar parâmetros de produção para contornar este achado. Primeiro corrigir/validar o caminho de realização; depois executar a bateria controlada.
+O bypass de safety buffer anteriormente identificado está corrigido no código atual, mas a liberação permanece bloqueada por falta de validação runtime completa.
 
-## 9. Próxima sequência
+## 12. Próxima sequência de auditoria
 
-1. Corrigir o bypass potencial do safety buffer no Lifecycle.
-2. Compilar e verificar ausência de regressão.
-3. Executar T-BRX-01 a T-BRX-06.
-4. Executar regressão R9/R10/R11.
-5. Somente então iniciar a calibração fina do `.set` de produção.
+1. Executar T-BRX-01: provocar resultado entre `5` e `10` e provar `HOLD`.
+2. Executar T-BRX-03: buffer `0`.
+3. Executar T-BRX-04: weighted BE.
+4. Executar T-BRX-05: R10 antes de BRX.
+5. Executar T-BRX-06: R10.2 antes de BRX.
+6. Executar teste de falha parcial R10.
+7. Executar regressão R9/R10/R11.
+8. Registrar commit exato + hash do `.set` de cada bateria relevante.
+9. Somente então revisar o gate final de PRE-LIVE.
