@@ -12,6 +12,7 @@
 #define EAGOLD_EXPIRY_DATE D'2026.12.31 00:00'
 
 double g_panelMinProfit=0.0;
+double g_panelMaxProfit=0.0;
 double g_panelMaxLots=0.0;
 bool g_panelInitialized=false;
 
@@ -79,107 +80,64 @@ extern double BRXBidirectionalMinProfit=5.00;
 // Runtime validation baseline: nominal floor 5.00 + safety buffer 5.00 = 10.00.
 extern double BRXRealizationSafetyBuffer=5.00;
 extern bool BRXRequireWeightedBE=false;
-extern double BRXWeightedBEBufferPoints=0.0;
 
 input string INPUT_GROUP_R13="=== R13 RECOVERY SATELLITE ===";
-// Runtime BRX isolation baseline: R13 disabled so it cannot affect BRX tests.
 extern bool EnableR13=false;
-extern bool EnableR13AutoActivation=false;
-extern bool EnableR13Trading=false;
-extern double R13ProfitTarget=5.00;
-extern double R13EntryCooldownSeconds=30.0;
-extern bool R13CloseWhenMasterFlat=true;
-extern bool EnableR13MasterAdjustment=true;
-extern double R13MasterAdjustmentMaxLots=0.20;
-extern int R13MagicNumber=3010;
-extern string R13OrderComment=EAGOLD_R13_DEFAULT_COMMENT;
-extern double R13MaxLots=0.20;
-extern int R13MaxPositions=3;
-extern double R13MaxDrawdown=50.00;
-extern double R13MaxDailyLoss=50.00;
-extern double R13MaxSpread=100.0;
+extern int R13Mode=1;
+extern double R13TriggerMasterLoss=100.0;
+extern double R13MaxSatelliteLots=1.00;
+extern int R13MaxSatellitePositions=10;
+extern double R13TargetProfit=5.0;
+extern double R13CooldownSeconds=60.0;
+extern double R13MinMasterExposureLots=0.10;
+extern double R13MinMasterDirectionalLots=0.10;
+extern double R13MaxSpreadPoints=100.0;
+extern double R13MaxDrawdown=0.0;
+extern double R13MaxDailyLoss=0.0;
 extern int R13StartHour=0;
 extern int R13EndHour=23;
-extern bool EnableR13DirectionalComplementarity=true;
-extern double R13MinDirectionalImbalance=0.01;
-extern double R13RecoveryCapitalFraction=1.00;
+extern double R13MinATRPoints=0.0;
+extern double R13MaxRangePoints=0.0;
+extern double R13MaxDriftPoints=0.0;
+extern bool R13RequireComplementarity=true;
+extern bool R13RequireDirectionalMaster=true;
+extern bool R13RequireTradingAllowed=true;
+extern bool R13EnableMasterAdjustment=true;
+extern double R13MasterAdjustmentTarget=5.0;
+extern double R13MasterAdjustmentMinLots=0.01;
+extern double R13CapitalMinRealized=0.0;
+extern bool R13PersistCapital=true;
 
-input string INPUT_GROUP_PANEL="=== MODULAR PANEL / DEBUG ===";
-extern bool EnableModularizationPanel=true;
-extern bool EnableModularizationDebug=false;
-
-input string INPUT_GROUP_CHART_GUIDES="=== CHART BASKET GUIDES ===";
-extern bool EnableChartBasketGuides=true;
-extern int ChartBasketGuideOffsetBars=2;
-
-input string INPUT_GROUP_R9="=== R9 EXPOSURE CONTROLLER ===";
-// Runtime BRX isolation baseline: R9 disabled during isolated BRX tests.
-extern bool EnableR9Hedge=false;
-extern double R9ExposureTriggerLots=1.00;
-extern double R9TriggerLotMinimum=0.00;
-extern double R9HedgeFraction=0.6666666667;
-extern double R9BalanceCap=0.50;
-
-input string INPUT_GROUP_R10="=== R10 EXPOSURE REDUCTION ===";
-// Runtime BRX isolation baseline: R10 disabled for the first BRX test battery.
+input string INPUT_GROUP_R10="=== R10 / R10.2 RECOVERY ===";
 extern bool EnableR10Reduce=false;
-extern double R10MinExposureLots=0.01;
-extern bool EnableR10PairReduction=false;
-extern double R10PairMinProfit=5.00;
-extern double R10PairMaxLots=1.00;
-extern int R10PairCooldownSeconds=30;
-extern bool EnableR10VisualMarker=true;
-extern string R10MarkerFont="Segoe UI Semibold";
-extern int R10MarkerFontSize=9;
-extern color R10BuyMarkerColor=clrLime;
-extern color R10SellMarkerColor=clrTomato;
-extern double R10MarkerOffsetPoints=25.0;
-
-input string INPUT_GROUP_ENGINE_MARKERS="=== ENGINE ACTION MARKERS ===";
-extern bool EnableEngineActionMarkers=true;
-extern string EngineActionMarkerFont="Impact";
-extern int EngineActionMarkerFontSize=9;
-extern color EngineActionMarkerTextColor=clrYellow;
-extern color EngineActionMarkerBackgroundColor=clrBlack;
-extern double EngineActionMarkerOffsetPips=20.0;
-extern double EngineActionMarkerStackStepPips=20.0;
-double EngineActionMarkerOffsetPoints=100.0;
-
-input string INPUT_GROUP_R102="=== R10.2 RECOVERY REALIZATION ===";
-// Runtime BRX isolation baseline: R10.2 disabled for the isolated battery.
 extern bool EnableR10RecoveryRealization=false;
-extern double R10RecoveryMinDebt=100.0;
-extern double R10RecoveryProfitTarget=50.0;
-extern double R10RecoveryDebtTargetPercent=0.0;
+extern double R10RecoveryMinDebt=5.0;
+extern double R10RecoveryTargetProfit=5.0;
 extern bool R10RecoveryRequireDebtRepaid=true;
+extern double R10RecoveryReductionRatio=1.0;
+extern double R10RecoveryMinLot=0.01;
+extern double R10RecoveryMaxLot=3.00;
 
-input string INPUT_GROUP_R11="=== R11 RECOVERY STEP / EXPOSURE GOVERNOR ===";
-extern bool EnableRecoveryStepMultiplier=true;
-extern double RecoveryStepMultiplier=1.15;
-extern double RecoveryStepMax=500.0;
-// R11 controls only NEW recovery exposure. Existing positions remain under R10/R9.
+input string INPUT_GROUP_R11="=== R11 EXPOSURE GOVERNOR ===";
 extern bool EnableR11ExposureGovernor=true;
-extern double R11TaperStartGrossExposureLots=8.00;
-extern double R11BlockGrossExposureLots=12.00;
+extern double R11TaperStartGrossExposureLots=8.0;
+extern double R11BlockGrossExposureLots=12.0;
 extern double R11MinNetToGrossRatio=0.10;
 extern double R11MinRecoveryLotFactor=0.25;
 
-input string INPUT_GROUP_PERSISTENCE="=== PERSISTENCE / CHECKPOINT POLICY ===";
-// Strategic state is persisted only on meaningful changes. A new worst-equity
-// checkpoint is considered meaningful when it moves by at least this amount.
-// Smaller changes remain in RAM and are persisted at the next significant event
-// or forced lifecycle checkpoint (OnDeinit).
-extern double PersistenceWorstEquityStep=5.00;
+input string INPUT_GROUP_R9="=== R9 HEDGE ===";
+extern bool EnableR9Hedge=false;
+extern double R9HedgeRatio=0.50;
+extern double R9HedgeMaxLot=1.00;
+extern int R9HedgeMagic=9009;
 
-input string INPUT_GROUP_UI="=== UI / PANEL ===";
-extern int PanelBackgroundX=260;
-extern int PanelBackgroundY=8;
-extern int PanelBackgroundHeight=450;
-extern int PanelBottomY=8;
-extern int PanelBottomX1=15;
-extern int PanelBottomX2=190;
-extern int PanelBottomX3=520;
-extern int PanelBottomX4=850;
+input string INPUT_GROUP_PERSISTENCE="=== OPERATIONAL PERSISTENCE ===";
+extern double PersistenceWorstEquityStep=10.0;
+
+input string INPUT_GROUP_UI="=== MODULARIZATION PANEL / UI ===";
+extern bool EnableModularizationPanel=true;
+extern bool EnableModularizationDebug=false;
 extern int PanelBackgroundWidth=430;
+extern bool EnableEngineActionMarkers=true;
 
 #endif
