@@ -83,7 +83,6 @@ int g_r12TransitionCount=0;
 int g_r12SequenceCount=0;
 string g_r12RegimeSequence="";
 
-// Event-boundary history. Updated only when a new closed M5 candle is observed.
 datetime g_r12LastObservedCandleTime=0;
 datetime g_r12EventBoundaryStartTime=0;
 datetime g_r12EventBoundaryLastChangeTime=0;
@@ -98,6 +97,22 @@ void EAGOLD_R12Reset(EAGOLD_R12_State &s)
    s.regimeDurationSec=0.0;s.timeSinceRegimeChangeSec=0.0;s.regimeChange=false;
    s.eventBoundaryTransitionCount=0;s.eventBoundarySequenceCount=0;s.eventBoundaryStartTime=0;s.eventBoundaryLastChangeTime=0;s.eventBoundaryRegimeSequence="";s.eventBoundaryDurationSec=0.0;
    s.close=0.0;s.atr=0.0;s.atrRatio=0.0;s.drift=0.0;s.slopeFast=0.0;s.slopeSlow=0.0;s.rangeRatio=0.0;s.bodyRatio=0.0;s.valid=false;
+}
+
+void EAGOLD_R12ResetHistory()
+{
+   g_r12PreviousRegime=EAGOLD_R12_UNKNOWN;
+   g_r12RegimeStartTime=0;
+   g_r12LastRegimeChangeTime=0;
+   g_r12TransitionCount=0;
+   g_r12SequenceCount=0;
+   g_r12RegimeSequence="";
+   g_r12LastObservedCandleTime=0;
+   g_r12EventBoundaryStartTime=0;
+   g_r12EventBoundaryLastChangeTime=0;
+   g_r12EventBoundaryTransitionCount=0;
+   g_r12EventBoundarySequenceCount=0;
+   g_r12EventBoundaryRegimeSequence="";
 }
 
 double EAGOLD_R12SMA(int period,int shift){return(iMA(Symbol(),PERIOD_M5,period,0,MODE_SMA,PRICE_CLOSE,shift));}
@@ -185,12 +200,7 @@ bool EAGOLD_R12Update(EAGOLD_R12_State &s)
    if(previous==EAGOLD_R12_UNKNOWN||g_r12RegimeStartTime<=0){g_r12RegimeStartTime=currentTime;g_r12LastRegimeChangeTime=currentTime;g_r12SequenceCount=1;g_r12RegimeSequence=EAGOLD_R12_RegimeName(current);g_r12TransitionCount=0;changed=false;}
    else if(changed){g_r12TransitionCount++;g_r12SequenceCount++;g_r12RegimeStartTime=currentTime;g_r12LastRegimeChangeTime=currentTime;string nextName=EAGOLD_R12_RegimeName(current);if(g_r12RegimeSequence=="")g_r12RegimeSequence=nextName;else g_r12RegimeSequence=g_r12RegimeSequence+">"+nextName;if(StringLen(g_r12RegimeSequence)>900){int cut=StringFind(g_r12RegimeSequence,">");if(cut>=0)g_r12RegimeSequence=StringSubstr(g_r12RegimeSequence,cut+1);}}
 
-   // Boundary history advances once per newly closed M5 candle, not once per tick.
-   if(g_r12LastObservedCandleTime!=currentTime)
-   {
-      EAGOLD_R12AppendEventBoundary(current,currentTime);
-      g_r12LastObservedCandleTime=currentTime;
-   }
+   if(g_r12LastObservedCandleTime!=currentTime){EAGOLD_R12AppendEventBoundary(current,currentTime);g_r12LastObservedCandleTime=currentTime;}
 
    s.time=currentTime;s.regime=current;s.previousRegime=previous;s.regimeStartTime=g_r12RegimeStartTime;s.previousRegimeChangeTime=g_r12LastRegimeChangeTime;
    s.regimeTransitionCount=g_r12TransitionCount;s.regimeSequenceCount=g_r12SequenceCount;s.regimeSequence=g_r12RegimeSequence;
