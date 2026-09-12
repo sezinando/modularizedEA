@@ -83,6 +83,7 @@ void EAGOLD_ExcursionTrackerStart(datetime now,double buyLots,double sellLots,do
    g_excursionStartRealized=EAGOLDAccumulatedProfit();g_excursionLastRealized=g_excursionStartRealized;g_excursionMFE=floatingPL;g_excursionMAE=floatingPL;g_excursionPeakFloatingPL=floatingPL;g_excursionLastFloatingPL=floatingPL;g_excursionLastObservedFloatingPL=floatingPL;
    g_excursionMaxBuyLots=buyLots;g_excursionMaxSellLots=sellLots;g_excursionMaxGrossLots=buyLots+sellLots;g_excursionMaxNetLots=MathAbs(buyLots-sellLots);g_excursionDirection=EAGOLD_ExcursionDirection(buyLots,sellLots);g_excursionRealizationEngine="";g_excursionRealizationType="";g_excursionRealizationSequence=0;
    g_excursionIntervalStartTime=now;g_excursionIntervalStartFloatingPL=floatingPL;g_excursionIntervalMFE=floatingPL;g_excursionIntervalMAE=floatingPL;g_excursionIntervalPeakFloatingPL=floatingPL;g_excursionIntervalLastFloatingPL=floatingPL;g_excursionIntervalMaxBuyLots=buyLots;g_excursionIntervalMaxSellLots=sellLots;g_excursionIntervalMaxGrossLots=buyLots+sellLots;g_excursionIntervalMaxNetLots=MathAbs(buyLots-sellLots);
+   EAGOLD_R12ResetEventBoundary();
    Print("EAGOLD EXCURSION START cycle=",g_excursionCycleId," direction=",g_excursionDirection," floating=",DoubleToString(floatingPL,2));
 }
 
