@@ -1,8 +1,9 @@
 #ifndef EAGOLD_EXCURSION_TRACKER_MQH
 #define EAGOLD_EXCURSION_TRACKER_MQH
 
-// EAGOLD EXCURSION TRACKER v1.4
+// EAGOLD EXCURSION TRACKER v1.5
 // Observer-only cycle/inter-event telemetry with R12 M5 context.
+// R12 event-boundary history captures the regime path since the prior realization.
 // No order, sizing, TP, BRX, R9, R10, R11 or R13 behavior is changed.
 
 bool g_excursionActive=false;
@@ -29,6 +30,7 @@ void EAGOLD_ExcursionEnsureEventFileHeader(int handle){
       "BUY_LOTS","SELL_LOTS","GROSS_LOTS","NET_LOTS","BUY_LOTS_MAX","SELL_LOTS_MAX","GROSS_LOTS_MAX","NET_LOTS_MAX",
       "INTERVAL_BUY_LOTS_MAX","INTERVAL_SELL_LOTS_MAX","INTERVAL_GROSS_LOTS_MAX","INTERVAL_NET_LOTS_MAX",
       "R12_VALID","R12_REGIME","R12_PREVIOUS_REGIME","R12_REGIME_CHANGE","R12_REGIME_DURATION_SEC","R12_TIME_SINCE_REGIME_CHANGE_SEC","R12_TRANSITION_COUNT","R12_SEQUENCE_COUNT","R12_REGIME_SEQUENCE",
+      "R12_EVENT_TRANSITIONS","R12_EVENT_SEQUENCE_COUNT","R12_EVENT_START_TIME","R12_EVENT_LAST_CHANGE_TIME","R12_EVENT_DURATION_SEC","R12_EVENT_REGIME_SEQUENCE",
       "R12_TIME","R12_CLOSE","R12_ATR","R12_ATR_RATIO","R12_DRIFT","R12_SLOPE_FAST","R12_SLOPE_SLOW","R12_RANGE_RATIO","R12_BODY_RATIO");
 }
 
@@ -53,7 +55,7 @@ void EAGOLD_ExcursionWriteRealizationEvent(string engine,string action,EAGOLD_Ac
    long intervalDuration=(long)(TimeCurrent()-g_excursionIntervalStartTime);if(intervalDuration<0)intervalDuration=0;
    double cycleGiveback=g_excursionPeakFloatingPL-g_excursionLastObservedFloatingPL;if(cycleGiveback<0.0)cycleGiveback=0.0;
    string eventId=g_excursionCycleId+"_R"+IntegerToString(g_excursionRealizationSequence);
-   string r12Valid=(g_r12State.valid?"1":"0"),r12Time=(g_r12State.valid?TimeToString(g_r12State.time,TIME_DATE|TIME_SECONDS):""),r12Regime=(g_r12State.valid?EAGOLD_R12_RegimeName(g_r12State.regime):"UNKNOWN"),r12Previous=(g_r12State.valid?EAGOLD_R12_RegimeName(g_r12State.previousRegime):"UNKNOWN"),r12Change=(g_r12State.valid&&g_r12State.regimeChange?"1":"0"),r12Sequence=(g_r12State.valid?g_r12State.regimeSequence:"");
+   string r12Valid=(g_r12State.valid?"1":"0"),r12Time=(g_r12State.valid?TimeToString(g_r12State.time,TIME_DATE|TIME_SECONDS):""),r12Regime=(g_r12State.valid?EAGOLD_R12_RegimeName(g_r12State.regime):"UNKNOWN"),r12Previous=(g_r12State.valid?EAGOLD_R12_RegimeName(g_r12State.previousRegime):"UNKNOWN"),r12Change=(g_r12State.valid&&g_r12State.regimeChange?"1":"0"),r12Sequence=(g_r12State.valid?g_r12State.regimeSequence:""),r12EventSequence=(g_r12State.valid?g_r12State.eventBoundaryRegimeSequence:"");
 
    FileWrite(handle,eventId,g_excursionCycleId,TimeToString(TimeCurrent(),TIME_DATE|TIME_SECONDS),IntegerToString(g_excursionRealizationSequence),engine,action,EAGOLD_ActionResultName(result),
       DoubleToString(realizedDelta,2),DoubleToString(realizedCumulative,2),DoubleToString(g_excursionLastObservedFloatingPL,2),DoubleToString(postActionFloatingPL,2),
@@ -62,10 +64,12 @@ void EAGOLD_ExcursionWriteRealizationEvent(string engine,string action,EAGOLD_Ac
       DoubleToString(buyLots,DigitsLots),DoubleToString(sellLots,DigitsLots),DoubleToString(grossLots,DigitsLots),DoubleToString(netLots,DigitsLots),DoubleToString(g_excursionMaxBuyLots,DigitsLots),DoubleToString(g_excursionMaxSellLots,DigitsLots),DoubleToString(g_excursionMaxGrossLots,DigitsLots),DoubleToString(g_excursionMaxNetLots,DigitsLots),
       DoubleToString(g_excursionIntervalMaxBuyLots,DigitsLots),DoubleToString(g_excursionIntervalMaxSellLots,DigitsLots),DoubleToString(g_excursionIntervalMaxGrossLots,DigitsLots),DoubleToString(g_excursionIntervalMaxNetLots,DigitsLots),
       r12Valid,r12Regime,r12Previous,r12Change,DoubleToString(g_r12State.regimeDurationSec,0),DoubleToString(g_r12State.timeSinceRegimeChangeSec,0),IntegerToString(g_r12State.regimeTransitionCount),IntegerToString(g_r12State.regimeSequenceCount),r12Sequence,
+      IntegerToString(g_r12State.eventBoundaryTransitionCount),IntegerToString(g_r12State.eventBoundarySequenceCount),TimeToString(g_r12State.eventBoundaryStartTime,TIME_DATE|TIME_SECONDS),TimeToString(g_r12State.eventBoundaryLastChangeTime,TIME_DATE|TIME_SECONDS),DoubleToString(g_r12State.eventBoundaryDurationSec,0),r12EventSequence,
       r12Time,DoubleToString(g_r12State.close,Digits),DoubleToString(g_r12State.atr,Digits),DoubleToString(g_r12State.atrRatio,4),DoubleToString(g_r12State.drift,4),DoubleToString(g_r12State.slopeFast,4),DoubleToString(g_r12State.slopeSlow,4),DoubleToString(g_r12State.rangeRatio,4),DoubleToString(g_r12State.bodyRatio,4));
    FileFlush(handle);FileClose(handle);g_excursionLastRealized=currentRealized;
    g_excursionIntervalStartTime=TimeCurrent();g_excursionIntervalStartFloatingPL=postActionFloatingPL;g_excursionIntervalMFE=postActionFloatingPL;g_excursionIntervalMAE=postActionFloatingPL;g_excursionIntervalPeakFloatingPL=postActionFloatingPL;g_excursionIntervalLastFloatingPL=postActionFloatingPL;
    g_excursionIntervalMaxBuyLots=buyLots;g_excursionIntervalMaxSellLots=sellLots;g_excursionIntervalMaxGrossLots=grossLots;g_excursionIntervalMaxNetLots=netLots;
+   EAGOLD_R12ResetEventBoundary();
 }
 
 void EAGOLD_ExcursionTrackerReset(){
