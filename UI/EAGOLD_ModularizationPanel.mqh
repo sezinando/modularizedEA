@@ -3,6 +3,7 @@
 
 string EAGOLD_MOD_PANEL_PREFIX="EAGOLD_MOD_";
 double g_modPanelMinProfit=0.0;
+double g_modPanelMaxProfit=0.0;
 double g_modPanelMaxLots=0.0;
 bool g_modPanelInitialized=false;
 
@@ -151,9 +152,11 @@ void EAGOLD_ModPanelUpdate()
    if(!g_modPanelInitialized)
    {
       string minKey=StateKey("PANEL_MIN_PROFIT");
-      string maxKey=StateKey("MAX_ACCUM_LOTS");
+      string maxProfitKey=StateKey("PANEL_MAX_PROFIT");
+      string maxLotsKey=StateKey("MAX_ACCUM_LOTS");
       g_modPanelMinProfit=GlobalVariableCheck(minKey)?GlobalVariableGet(minKey):totalProfit;
-      g_modPanelMaxLots=GlobalVariableCheck(maxKey)?GlobalVariableGet(maxKey):grossLots;
+      g_modPanelMaxProfit=GlobalVariableCheck(maxProfitKey)?GlobalVariableGet(maxProfitKey):totalProfit;
+      g_modPanelMaxLots=GlobalVariableCheck(maxLotsKey)?GlobalVariableGet(maxLotsKey):grossLots;
       g_modPanelInitialized=true;
    }
 
@@ -163,17 +166,23 @@ void EAGOLD_ModPanelUpdate()
       g_modPanelMinProfit=totalProfit;
       extremaChanged=true;
    }
+   if(totalProfit>g_modPanelMaxProfit)
+   {
+      g_modPanelMaxProfit=totalProfit;
+      extremaChanged=true;
+   }
    if(grossLots>g_modPanelMaxLots)
    {
       g_modPanelMaxLots=grossLots;
       extremaChanged=true;
    }
    if(extremaChanged)
-      PersistPanelExtrema(g_modPanelMinProfit,g_modPanelMaxLots);
+      PersistPanelExtrema(g_modPanelMinProfit,grossLots,g_modPanelMaxProfit);
 
    // Keep the persistence-layer compatibility state synchronized in memory.
    // No GlobalVariable write occurs here unless an actual extrema change happened.
    g_panelMinProfit=g_modPanelMinProfit;
+   g_panelMaxProfit=g_modPanelMaxProfit;
    g_panelMaxLots=g_modPanelMaxLots;
    g_panelInitialized=g_modPanelInitialized;
 
@@ -201,6 +210,7 @@ void EAGOLD_ModPanelUpdate()
    EAGOLD_ModPanelLabel("EQUITY",StringFormat("EQUITY    %14s",EAGOLD_ModPanelMoney(equity)),row++,clrAqua);
    EAGOLD_ModPanelLabel("ACCUM",StringFormat("LUCRO DO DIA %9s",EAGOLD_ModPanelMoney(todayProfit)),row++,todayProfit>=0.0?clrLime:clrTomato);
    EAGOLD_ModPanelLabel("MIN",StringFormat("MENOR P/L   %11s",EAGOLD_ModPanelMoney(g_modPanelMinProfit)),row++,clrYellow);
+   EAGOLD_ModPanelLabel("MAXPROFIT",StringFormat("MAIOR P/L   %11s",EAGOLD_ModPanelMoney(g_modPanelMaxProfit)),row++,clrYellow);
    EAGOLD_ModPanelLabel("LOTS",StringFormat("LOTES ATUAIS %9s",EAGOLD_ModPanelLots(grossLots)),row++,clrWhite);
    EAGOLD_ModPanelLabel("MAXLOTS",StringFormat("MAIOR ACUM. %9s",EAGOLD_ModPanelLots(g_modPanelMaxLots)),row++,clrYellow);
    EAGOLD_ModPanelLabel("DD",StringFormat("DD %11s  %6.2f%%",EAGOLD_ModPanelMoney(currentDD),ddPct),row++,currentDD>0.0?clrYellow:clrLime);
@@ -242,7 +252,7 @@ void EAGOLD_ModPanelUpdate()
 
 void EAGOLD_ModPanelDelete()
 {
-   string ids[]={"BG","TITLE","SEP1","IDENT","MARKET","SPREAD","SEP2","BUY","SELL","EXPOS","PENDING","SEP3","TOTAL","EQUITY","ACCUM","MIN","LOTS","MAXLOTS","DD","SEP4","R13A","R13B","R13C","HEDGE","R11","REC","RECD","SEP5","BRX","TRAIL","TIME","SEP6","DBG1","DBG2","DBG3","DBG4","DBG5","DBG6","DBG7","DBG8"};
+   string ids[]={"BG","TITLE","SEP1","IDENT","MARKET","SPREAD","SEP2","BUY","SELL","EXPOS","PENDING","SEP3","TOTAL","EQUITY","ACCUM","MIN","MAXPROFIT","LOTS","MAXLOTS","DD","SEP4","R13A","R13B","R13C","HEDGE","R11","REC","RECD","SEP5","BRX","TRAIL","TIME","SEP6","DBG1","DBG2","DBG3","DBG4","DBG5","DBG6","DBG7","DBG8"};
    for(int i=0;i<ArraySize(ids);i++)
    {
       string name=EAGOLD_MOD_PANEL_PREFIX+ids[i];
@@ -255,6 +265,7 @@ void EAGOLD_ModPanelDelete()
    }
    g_modPanelInitialized=false;
    g_modPanelMinProfit=0.0;
+   g_modPanelMaxProfit=0.0;
    g_modPanelMaxLots=0.0;
 }
 
