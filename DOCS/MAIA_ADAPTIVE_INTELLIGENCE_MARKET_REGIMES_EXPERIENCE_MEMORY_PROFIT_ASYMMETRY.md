@@ -991,6 +991,297 @@ REGIME ACTION MATRIX
 ADAPTIVE POLICY
 ```
 
+---
+
+## 31. R12 — Information-Theoretic Market Regime Engine
+
+### 31.1 Concept
+
+A future **R12 Market Regime Engine** may incorporate **normalized Shannon entropy** as an information-theoretic dimension of market state.
+
+The purpose is not to use entropy as a standalone BUY/SELL signal. The purpose is to estimate how organized, concentrated or unpredictable the recent distribution of discretized price-return outcomes is, and combine that information with direction, volatility, persistence and market structure.
+
+Conceptually:
+
+```text
+R12
+├── Direction
+├── Volatility
+├── Entropy
+├── Persistence
+├── Expansion / Compression
+└── Market State
+```
+
+Entropy is therefore an **information dimension**, not the complete regime classifier.
+
+### 31.2 Normalized Shannon Entropy
+
+For a set of binned return outcomes with probabilities `p_i`, Shannon entropy is:
+
+```text
+H = - Σ p_i log(p_i)
+```
+
+A normalized form can be expressed as:
+
+```text
+H_norm = H / log(K)
+```
+
+where `K` is the number of return bins/categories, producing a value in the interval `[0,1]` when the normalization and category definition are valid.
+
+The implementation must explicitly define:
+
+- return calculation;
+- observation window;
+- binning method;
+- number of bins/categories;
+- timeframe;
+- treatment of zero/stale returns;
+- session boundaries;
+- normalization;
+- minimum sample size.
+
+These are part of the model definition and must not be left implicit.
+
+### 31.3 Initial Hypothesis — NOT a Production Threshold
+
+The following ranges are retained as **research hypotheses only**:
+
+```text
+H < 0.30
+    Possible organized / concentrated behavior
+
+0.40 ≤ H ≤ 0.70
+    Possible equilibrium / consolidation behavior
+
+H > 0.85
+    Possible high-complexity / chaotic behavior
+```
+
+These thresholds are **not validated constants** and must not be converted directly into production gates.
+
+Entropy is sensitive to the asset, timeframe, session, return discretization, window length, microstructure, volatility and stale/zero observations. In particular, a low entropy value can be produced by repeated zero returns rather than by a genuine directional trend. High entropy also does not automatically imply that trading should be blocked.
+
+Therefore:
+
+> **Never interpret entropy in isolation.**
+
+### 31.4 Proposed R12 Interpretation
+
+The useful state is the combination of entropy with other dimensions.
+
+```text
+LOW ENTROPY
++ STRONG DIRECTION / PERSISTENCE
+        ↓
+STRUCTURED TREND
+        ↓
+HIGHER RISK FOR COUNTERTREND RECOVERY
+```
+
+```text
+MEDIUM ENTROPY
++ WEAK DIRECTION
++ LOW/MODERATE VOLATILITY
+        ↓
+EQUILIBRIUM / RANGE
+        ↓
+POTENTIALLY FAVORABLE FOR GRID BEHAVIOR
+```
+
+```text
+HIGH ENTROPY
++ HIGH VOLATILITY
++ UNSTABLE DIRECTION
+        ↓
+COMPLEX / UNSTABLE REGIME
+        ↓
+POTENTIALLY HIGHER EXECUTION AND LIQUIDITY RISK
+```
+
+These interpretations are hypotheses to be tested against historical outcomes.
+
+### 31.5 Proposed Entropy-Gated Execution — Research Only
+
+The original concept proposed using entropy to influence execution policy:
+
+```text
+LOW ENTROPY
+→ disable/restrict recovery against a strong trend
+→ potentially slow or restrict R1 admission
+
+MEDIUM ENTROPY
+→ potentially permit normal grid / mean-reversion behavior
+
+HIGH ENTROPY
+→ potentially restrict new levels
+→ potentially increase R10 protection/reduction priority
+```
+
+This policy is **not authorized for implementation** at this stage.
+
+In particular:
+
+- entropy alone must not block R1;
+- entropy alone must not disable recovery;
+- `H > 0.85` must not automatically trigger R10;
+- entropy must not override the existing R1/R10/R11 safety architecture;
+- no current v0.106 engine should be modified as a consequence of this document.
+
+The preferred future architecture is:
+
+```text
+Entropy
+   +
+Direction
+   +
+Volatility
+   +
+Persistence
+   +
+Structure
+        ↓
+      R12
+        ↓
+Context / Regime
+        ↓
+R1 Admission / R11 / R10 policy
+```
+
+R12 should therefore provide **context**, while the existing engines retain explicit control over their permitted actions.
+
+### 31.6 Observability Before Intervention
+
+The first implementation step, when authorized, should be an **observer/telemetry layer with zero operational impact**.
+
+At minimum, the dataset should record:
+
+```text
+entropy_t-1
+entropy_t-2
+entropy_t-3
+entropy_window
+entropy_bins
+entropy_timeframe
+direction
+persistence
+ATR / volatility
+spread
+expansion / compression
+current exposure
+R1 activity
+R4/R5 activity
+R10 intervention
+basket survival
+MAE
+MFE
+maximum exposure
+time to recovery
+realized P&L
+final economic result
+```
+
+The principal tests should include:
+
+```text
+P(LOSS | entropy regime)
+P(LARGE_DRAWDOWN | entropy + direction + volatility)
+P(R10 INTERVENTION | entropy regime)
+P(HIGH MFE | entropy + direction + volatility)
+```
+
+The objective is to determine whether entropy adds predictive information beyond existing variables rather than assuming that it does.
+
+### 31.7 Research Controls
+
+Before operational use, the entropy feature should be evaluated for:
+
+1. parameter sensitivity;
+2. stability across symbols;
+3. stability across M1/M5/M15;
+4. session dependence;
+5. sensitivity to zero/stale returns;
+6. sensitivity to volatility clustering;
+7. out-of-sample performance;
+8. regime persistence and transition frequency;
+9. incremental predictive value versus simpler features;
+10. economic impact after transaction costs and execution effects.
+
+A useful validation question is:
+
+> **Does entropy improve the classification of dangerous or favorable market states after direction and volatility are already known?**
+
+If the answer is no, entropy should remain telemetry rather than become an operational gate.
+
+### 31.8 Relationship to MAIA Learning
+
+Entropy can become one feature in the future MAIA experience record:
+
+```text
+MARKET STATE
+    ├── Direction
+    ├── Volatility
+    ├── Structure
+    ├── Persistence
+    └── Entropy
+          ↓
+ACTION
+          ↓
+RESULT
+    ├── P&L
+    ├── MAE
+    ├── MFE
+    ├── Drawdown
+    └── Profit Capture
+```
+
+This allows MAIA to learn whether a given action performs differently under different entropy conditions without prematurely hard-coding a causal interpretation.
+
+### 31.9 MQL4 / MQL5 Priority
+
+The entropy/R12 concept does **not** justify an immediate migration from the current MQL4 baseline to MQL5.
+
+The immediate project priority remains behavioral and economic validation of EAGOLD v0.106 in its current environment. A migration would introduce an additional equivalence risk before the current lifecycle, BRX, R10 and recovery behavior is fully proven.
+
+MQL5 migration can be reconsidered after:
+
+- the current baseline is behaviorally validated;
+- the experience dataset exists;
+- entropy has demonstrated incremental value;
+- R12 has a validated specification.
+
+### 31.10 R12 Status
+
+```text
+STATUS              = RESEARCH / FUTURE IMPLEMENTATION
+OPERATIONAL IMPACT  = NONE
+CURRENT EA CHANGES  = NONE
+PRODUCTION GATES    = NOT AUTHORIZED
+THRESHOLDS          = HYPOTHESES ONLY
+FIRST STEP          = OBSERVABILITY
+```
+
+R12 should only progress from observer to advisor, and eventually to controlled execution influence, through the same validation sequence defined for MAIA:
+
+```text
+OBSERVE
+   ↓
+RECORD
+   ↓
+ANALYZE
+   ↓
+VALIDATE
+   ↓
+ADVISE
+   ↓
+CONTROLLED ADAPTATION
+```
+
+---
+
 **Document classification:** FUTURE_IMPLEMENTATIONS  
 **Operational impact:** NONE  
-**Baseline modification:** NONE
+**Baseline modification:** NONE  
+**R12 operational authorization:** NONE
