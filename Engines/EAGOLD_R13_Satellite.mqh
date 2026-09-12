@@ -3,16 +3,17 @@
 
 //==================================================================
 // R13 RECOVERY SATELLITE
-// Initial operating contract:
+// Transactional operating contract:
 //   1) work in parallel with the Master;
 //   2) take only the complementary direction while Master is exposed;
 //   3) realize Satellite profit independently;
 //   4) realized positive R13 profit may fund an R10 average adjustment;
 //   5) when Master exposure goes to zero, R13 must leave the market.
 //
-// This stage intentionally does NOT attempt the later range-entry,
-// persistence, capital-reserve or advanced recovery policies.
-// The regime classifier remains telemetry only in this stage.
+// Economic exits are governed by EAGOLD_ActionResult. A partial broker
+// execution is never treated as a successful exit and never releases
+// recovery capital. A partial/failed transaction consumes the economic
+// path until reconciliation has confirmed broker state.
 //==================================================================
 
 #define R13_REGIME_OFF       0
@@ -247,21 +248,57 @@ bool R13CloseTicket(int ticket,double &realized){
    return(true);
 }
 
-bool R13CloseAll(string reason,double &realizedTotal){
+EAGOLD_ActionResult R13CloseAllTransactional(string reason,int &requestedCount,int &completedCount,double &requestedLots,double &completedLots,double &realizedTotal){
+   requestedCount=0;
+   completedCount=0;
+   requestedLots=0.0;
+   completedLots=0.0;
    realizedTotal=0.0;
-   bool changed=false;
+
+   int tickets[];
+   ArrayResize(tickets,0);
    for(int i=OrdersTotal()-1;i>=0;i--){
       if(!OrderSelect(i,SELECT_BY_POS,MODE_TRADES))continue;
       if(!IsR13Order())continue;
       int type=OrderType();
       if(type!=OP_BUY&&type!=OP_SELL)continue;
-      int ticket=OrderTicket();
-      double realized=0.0;
-      if(R13CloseTicket(ticket,realized)){realizedTotal+=realized;changed=true;}
+      int n=ArraySize(tickets);
+      ArrayResize(tickets,n+1);
+      tickets[n]=OrderTicket();
+      requestedCount++;
+      requestedLots+=OrderLots();
    }
-   if(changed)Print(EA_NAME," R13 EXIT: reason=",reason," realized=$",DoubleToString(realizedTotal,2));
-   if(changed)g_r13LastEntry=TimeCurrent();
-   return(changed);
+
+   if(requestedCount<=0)return(EAGOLD_ACTION_BLOCKED);
+
+   for(int j=0;j<ArraySize(tickets);j++){
+      int ticket=tickets[j];
+      double beforeLots=0.0;
+      if(OrderSelect(ticket,SELECT_BY_TICKET,MODE_TRADES))beforeLots=OrderLots();
+      double realized=0.0;
+      if(R13CloseTicket(ticket,realized)){
+         completedCount++;
+         completedLots+=beforeLots;
+         realizedTotal+=realized;
+      }
+   }
+
+   int remaining=R13CountOwnPositions();
+   bool postcondition=(remaining==0);
+
+   if(completedCount==requestedCount && postcondition){
+      Print(EA_NAME," R13 TRANSACTION COMPLETED: reason=",reason," positions=",completedCount," lots=",DoubleToString(completedLots,DigitsLots)," realized=$",DoubleToString(realizedTotal,2));
+      g_r13LastEntry=TimeCurrent();
+      return(EAGOLD_ACTION_COMPLETED);
+   }
+
+   if(completedCount>0){
+      Print(EA_NAME," R13 TRANSACTION PARTIAL: reason=",reason," requested=",requestedCount," completed=",completedCount," requestedLots=",DoubleToString(requestedLots,DigitsLots)," completedLots=",DoubleToString(completedLots,DigitsLots)," remaining=",remaining," realized=$",DoubleToString(realizedTotal,2));
+      return(EAGOLD_ACTION_PARTIAL);
+   }
+
+   Print(EA_NAME," R13 TRANSACTION FAILED: reason=",reason," requested=",requestedCount," remaining=",remaining);
+   return(EAGOLD_ACTION_FAILED);
 }
 
 void R13AddRecoveryCapital(double realized){
@@ -290,28 +327,42 @@ void R13ManageOpenPositions(int masterDirection,double masterExposure){
    double ownProfit=R13OwnProfit();
    if(R13CountOwnPositions()<=0)return;
 
-   // Never allow the Satellite to remain aligned with the Master after a
-   // directional flip. It is a hedge/satellite, not a second Master basket.
    int required=R13ComplementaryDirection(masterDirection);
+
    if(masterExposure<R13MinDirectionalImbalance){
-      double realized=0.0;
-      if(R13CloseWhenMasterFlat)R13CloseAll("MASTER_FLAT",realized);
-      R13AddRecoveryCapital(realized);
-      R13TryFundMasterAdjustment();
+      if(!R13CloseWhenMasterFlat)return;
+      int requestedCount=0,completedCount=0;
+      double requestedLots=0.0,completedLots=0.0,realized=0.0;
+      EAGOLD_ActionResult result=R13CloseAllTransactional("MASTER_FLAT",requestedCount,completedCount,requestedLots,completedLots,realized);
+      EAGOLD_ApplyActionResult(result,"R13","MASTER_FLAT",R13OwnDirection(),completedLots);
+      if(result==EAGOLD_ACTION_COMPLETED){
+         R13AddRecoveryCapital(realized);
+         return;
+      }
       return;
    }
+
    if(EnableR13DirectionalComplementarity&&required>=0&&ownDirection>=0&&ownDirection!=required){
-      double realized=0.0;
-      R13CloseAll("MASTER_DIRECTION_CHANGED",realized);
-      R13AddRecoveryCapital(realized);
-      R13TryFundMasterAdjustment();
+      int requestedCount=0,completedCount=0;
+      double requestedLots=0.0,completedLots=0.0,realized=0.0;
+      EAGOLD_ActionResult result=R13CloseAllTransactional("MASTER_DIRECTION_CHANGED",requestedCount,completedCount,requestedLots,completedLots,realized);
+      EAGOLD_ApplyActionResult(result,"R13","MASTER_DIRECTION_CHANGED",ownDirection,completedLots);
+      if(result==EAGOLD_ACTION_COMPLETED){
+         R13AddRecoveryCapital(realized);
+         return;
+      }
       return;
    }
+
    if(R13ProfitTarget>0.0&&ownProfit>=R13ProfitTarget){
-      double realized=0.0;
-      R13CloseAll("R13_PROFIT_TARGET",realized);
-      R13AddRecoveryCapital(realized);
-      R13TryFundMasterAdjustment();
+      int requestedCount=0,completedCount=0;
+      double requestedLots=0.0,completedLots=0.0,realized=0.0;
+      EAGOLD_ActionResult result=R13CloseAllTransactional("R13_PROFIT_TARGET",requestedCount,completedCount,requestedLots,completedLots,realized);
+      EAGOLD_ApplyActionResult(result,"R13","R13_PROFIT_TARGET",ownDirection,completedLots);
+      if(result==EAGOLD_ACTION_COMPLETED){
+         R13AddRecoveryCapital(realized);
+         return;
+      }
       return;
    }
 }
@@ -367,6 +418,9 @@ void R13Observe(R13ObserverState &state){
 
    if(state.tradingEnabled){
       R13ManageOpenPositions(state.masterDirection,state.masterExposureLots);
+      // A transactional exit consumes this tick. Do not reopen the Satellite
+      // or launch a downstream R10 adjustment on the same tick.
+      if(!EAGOLD_EconomicExecutionAllowed())return;
       R13TryOpen(state.masterDirection,state.masterExposureLots,state.regime);
       state.masterExposureLots=ExposureLots();
       state.masterDirection=HeavyDirection();
