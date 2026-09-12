@@ -3,6 +3,9 @@
 
 // Stage 2: Core execution layer extracted from the proven EAGOLD v0.106 baseline.
 // Behavioral logic is intentionally preserved; orchestration remains in EA/EAGOLD.mq4.
+// R13 uses a reserved Magic namespace, therefore it has dedicated Core wrappers
+// that enforce the same global trading/expiry policy without crossing the Master
+// ownership boundary enforced by IsEAGOLDOrder().
 
 int SendPending(int type,double price,double lots,string comment)
 {
@@ -16,7 +19,46 @@ int SendMarket(int type,double lots,string comment)
    RefreshRates();lots=NormalizeLot(lots);double price=(type==OP_BUY?Ask:Bid);ResetLastError();int ticket=OrderSend(Symbol(),type,lots,NormalizePrice(price),0,0,0,comment,MagicNumber,0,clrNONE);if(ticket<0)Print(EA_NAME," market send failed. type=",type," error=",GetLastError()," comment=",comment);else Print(EA_NAME," market created. ticket=",ticket," type=",type," lot=",DoubleToString(lots,DigitsLots)," comment=",comment);return(ticket);
 }
 
-bool CloseMarketOrder(int ticket){if(!OrderSelect(ticket,SELECT_BY_TICKET,MODE_TRADES))return(false);if(!IsEAGOLDOrder())return(false);int type=OrderType();if(type!=OP_BUY&&type!=OP_SELL)return(false);RefreshRates();double price=(type==OP_BUY?Bid:Ask);ResetLastError();if(!OrderClose(ticket,OrderLots(),NormalizePrice(price),0,clrNONE)){Print(EA_NAME," market close failed. ticket=",ticket," error=",GetLastError());return(false);}return(true);}
+// Generic reserved-Magic market entry. Ownership is explicit and independent
+// from IsEAGOLDOrder(), which deliberately excludes R13 from the Master set.
+int SendMarketByMagic(int type,double lots,string comment,int magic)
+{
+   if(!EAGOLD_TradingAllowed()){Print(EA_NAME," ORDER BLOCKED: test validity expired on 30/12/2026.");return(-1);}
+   if(magic<0){Print(EA_NAME," market send blocked: invalid magic.");return(-1);}
+   if(type!=OP_BUY&&type!=OP_SELL)return(-1);
+   RefreshRates();
+   lots=NormalizeLot(lots);
+   if(lots<Lot)return(-1);
+   double price=(type==OP_BUY?Ask:Bid);
+   ResetLastError();
+   int ticket=OrderSend(Symbol(),type,lots,NormalizePrice(price),0,0,0,comment,magic,0,clrNONE);
+   if(ticket<0)Print(EA_NAME," market send failed. type=",type," magic=",magic," error=",GetLastError()," comment=",comment);
+   else Print(EA_NAME," market created. ticket=",ticket," type=",type," lot=",DoubleToString(lots,DigitsLots)," magic=",magic," comment=",comment);
+   return(ticket);
+}
+
+// Generic reserved-Magic close. It deliberately validates Symbol + Magic and
+// does not use IsEAGOLDOrder(), because R13 is outside the Master ownership set.
+bool CloseMarketOrderByMagic(int ticket,int magic,double &realized)
+{
+   realized=0.0;
+   if(!OrderSelect(ticket,SELECT_BY_TICKET,MODE_TRADES))return(false);
+   if(OrderSymbol()!=Symbol()||OrderMagicNumber()!=magic)return(false);
+   int type=OrderType();
+   if(type!=OP_BUY&&type!=OP_SELL)return(false);
+   double lots=OrderLots();
+   RefreshRates();
+   double price=(type==OP_BUY?Bid:Ask);
+   ResetLastError();
+   if(!OrderClose(ticket,lots,NormalizePrice(price),0,clrNONE)){
+      Print(EA_NAME," market close failed. ticket=",ticket," magic=",magic," error=",GetLastError());
+      return(false);
+   }
+   if(OrderSelect(ticket,SELECT_BY_TICKET,MODE_HISTORY))realized=OrderProfit()+OrderSwap()+OrderCommission();
+   return(true);
+}
+
+bool CloseMarketOrder(int ticket){double realized=0.0;if(!OrderSelect(ticket,SELECT_BY_TICKET,MODE_TRADES))return(false);if(!IsEAGOLDOrder())return(false);int type=OrderType();if(type!=OP_BUY&&type!=OP_SELL)return(false);RefreshRates();double price=(type==OP_BUY?Bid:Ask);ResetLastError();if(!OrderClose(ticket,OrderLots(),NormalizePrice(price),0,clrNONE)){Print(EA_NAME," market close failed. ticket=",ticket," error=",GetLastError());return(false);}return(true);}
 bool CloseMarketOrderLots(int ticket,double lots,double &realized){realized=0.0;if(!OrderSelect(ticket,SELECT_BY_TICKET,MODE_TRADES))return(false);if(!IsEAGOLDOrder())return(false);int type=OrderType();if(type!=OP_BUY&&type!=OP_SELL)return(false);double available=OrderLots();double closeLots=NormalizeDouble(MathMin(lots,available),DigitsLots);if(closeLots<Lot)return(false);RefreshRates();double price=(type==OP_BUY?Bid:Ask);ResetLastError();if(!OrderClose(ticket,closeLots,NormalizePrice(price),0,clrNONE)){Print(EA_NAME," partial close failed. ticket=",ticket," lots=",DoubleToString(closeLots,DigitsLots)," error=",GetLastError());return(false);}if(OrderSelect(ticket,SELECT_BY_TICKET,MODE_HISTORY))realized=OrderProfit()+OrderSwap()+OrderCommission();return(true);}
 bool DeletePendingOrder(int ticket){if(!OrderSelect(ticket,SELECT_BY_TICKET,MODE_TRADES))return(false);if(!IsEAGOLDOrder())return(false);int type=OrderType();if(type!=OP_BUYSTOP&&type!=OP_SELLSTOP)return(false);ResetLastError();if(!OrderDelete(ticket)){Print(EA_NAME," pending delete failed. ticket=",ticket," error=",GetLastError());return(false);}return(true);}
 
