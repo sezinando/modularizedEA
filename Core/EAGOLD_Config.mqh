@@ -3,7 +3,7 @@
 
 //==================================================================
 // EAGOLD CONFIGURATION CONTRACT
-// Centralized input configuration extracted from EAGOLD v0.106.
+// Centralized input configuration extracted from EAGOLD v0.107.
 // Keep business behavior out of this file.
 //
 // ORGANIZATION RULE
@@ -17,7 +17,7 @@
 // 08. Persistence
 //==================================================================
 
-#define EAGOLD_VERSION "0.106"
+#define EAGOLD_VERSION "0.107"
 #define EAGOLD_R13_DEFAULT_COMMENT "EAGOLD_RECOVERY_SATELLITE"
 #define EAGOLD_EXPIRY_DATE D'2026.12.31 00:00'
 
