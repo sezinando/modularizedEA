@@ -70,7 +70,17 @@ struct EAGOLD_R12_State
 
 EAGOLD_R12_State g_r12State;
 
-void EAGOLD_R12Reset(EAGOLD_R12_State &s)
+// History is deliberately kept outside g_r12State because Update() resets
+// the output structure on every observation. These variables preserve the
+// previous closed-candle classification across updates.
+EAGOLD_R12_Regime g_r12PreviousRegime=EAGOLD_R12_UNKNOWN;
+datetime g_r12RegimeStartTime=0;
+datetime g_r12LastRegimeChangeTime=0;
+int g_r12TransitionCount=0;
+int g_r12SequenceCount=0;
+string g_r12RegimeSequence="";
+
+evoid EAGOLD_R12Reset(EAGOLD_R12_State &s)
 {
    s.time=0;
    s.regime=EAGOLD_R12_UNKNOWN;
@@ -140,13 +150,6 @@ bool EAGOLD_R12Update(EAGOLD_R12_State &s)
    bool bearTransition=(fast<slow && slopeFast<0.0 && slopeSlow>=-0.03 && drift<0.0);
    bool exhaustion=(MathAbs(drift)>=2.00 && bodyRatio>=0.70);
 
-   EAGOLD_R12_Regime previous=g_r12State.regime;
-   datetime previousStart=g_r12State.regimeStartTime;
-   datetime lastChange=g_r12State.previousRegimeChangeTime;
-   int transitions=g_r12State.regimeTransitionCount;
-   int sequenceCount=g_r12State.regimeSequenceCount;
-   string sequence=g_r12State.regimeSequence;
-
    EAGOLD_R12_Regime current=EAGOLD_R12_CONFLICT;
    if(highVol)current=EAGOLD_R12_HIGH_VOLATILITY;
    else if(exhaustion)current=EAGOLD_R12_EXHAUSTION;
@@ -158,43 +161,46 @@ bool EAGOLD_R12Update(EAGOLD_R12_State &s)
    else if(bearTransition)current=EAGOLD_R12_TRANSITION_BEARISH;
    else if(lowVol)current=EAGOLD_R12_LOW_VOLATILITY;
 
+   EAGOLD_R12_Regime previous=g_r12PreviousRegime;
    datetime currentTime=iTime(Symbol(),PERIOD_M5,sh);
    bool changed=(previous!=EAGOLD_R12_UNKNOWN && current!=previous);
-   if(previous==EAGOLD_R12_UNKNOWN || previousStart<=0)
+
+   if(previous==EAGOLD_R12_UNKNOWN || g_r12RegimeStartTime<=0)
    {
-      previousStart=currentTime;
-      lastChange=currentTime;
-      sequenceCount=1;
-      sequence=EAGOLD_R12_RegimeName(current);
-      transitions=0;
+      g_r12RegimeStartTime=currentTime;
+      g_r12LastRegimeChangeTime=currentTime;
+      g_r12SequenceCount=1;
+      g_r12RegimeSequence=EAGOLD_R12_RegimeName(current);
+      g_r12TransitionCount=0;
+      changed=false;
    }
    else if(changed)
    {
-      transitions++;
-      sequenceCount++;
-      previousStart=currentTime;
-      lastChange=currentTime;
+      g_r12TransitionCount++;
+      g_r12SequenceCount++;
+      g_r12RegimeStartTime=currentTime;
+      g_r12LastRegimeChangeTime=currentTime;
       string nextName=EAGOLD_R12_RegimeName(current);
-      if(sequence=="")sequence=nextName;
-      else sequence=sequence+">"+nextName;
+      if(g_r12RegimeSequence=="")g_r12RegimeSequence=nextName;
+      else g_r12RegimeSequence=g_r12RegimeSequence+">"+nextName;
       // Prevent unbounded telemetry strings during long EA sessions.
-      if(StringLen(sequence)>900)
+      if(StringLen(g_r12RegimeSequence)>900)
       {
-         int cut=StringFind(sequence,">");
-         if(cut>=0)sequence=StringSubstr(sequence,cut+1);
+         int cut=StringFind(g_r12RegimeSequence,">");
+         if(cut>=0)g_r12RegimeSequence=StringSubstr(g_r12RegimeSequence,cut+1);
       }
    }
 
    s.time=currentTime;
    s.regime=current;
    s.previousRegime=previous;
-   s.regimeStartTime=previousStart;
-   s.previousRegimeChangeTime=lastChange;
-   s.regimeTransitionCount=transitions;
-   s.regimeSequenceCount=sequenceCount;
-   s.regimeSequence=sequence;
-   s.regimeDurationSec=(double)MathMax(0,(int)(currentTime-previousStart));
-   s.timeSinceRegimeChangeSec=(double)MathMax(0,(int)(currentTime-lastChange));
+   s.regimeStartTime=g_r12RegimeStartTime;
+   s.previousRegimeChangeTime=g_r12LastRegimeChangeTime;
+   s.regimeTransitionCount=g_r12TransitionCount;
+   s.regimeSequenceCount=g_r12SequenceCount;
+   s.regimeSequence=g_r12RegimeSequence;
+   s.regimeDurationSec=(double)MathMax(0,(int)(currentTime-g_r12RegimeStartTime));
+   s.timeSinceRegimeChangeSec=(double)MathMax(0,(int)(currentTime-g_r12LastRegimeChangeTime));
    s.regimeChange=changed;
    s.close=close;
    s.atr=atr;
@@ -205,6 +211,9 @@ bool EAGOLD_R12Update(EAGOLD_R12_State &s)
    s.rangeRatio=rangeRatio;
    s.bodyRatio=bodyRatio;
    s.valid=true;
+
+   // Commit history only after the complete observation is valid.
+   g_r12PreviousRegime=current;
    return(true);
 }
 
