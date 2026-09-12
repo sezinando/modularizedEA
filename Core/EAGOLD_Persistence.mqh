@@ -88,19 +88,23 @@ void PersistR13State(bool force=false){
    if(force)GlobalVariablesFlush();
 }
 
-void PersistPanelExtrema(double currentProfit,double currentLots)
+void PersistPanelExtrema(double currentProfit,double currentLots,double currentMaxProfit)
 {
    // In Strategy Tester, panel extrema belong to the current test run only.
    if(!EAGOLD_PersistenceEnabled())return;
 
    string minKey=StateKey("PANEL_MIN_PROFIT");
-   string maxKey=StateKey("MAX_ACCUM_LOTS");
+   string maxProfitKey=StateKey("PANEL_MAX_PROFIT");
+   string maxLotsKey=StateKey("MAX_ACCUM_LOTS");
    double persistedMin=PersistMonotonicMin(minKey,currentProfit);
-   double persistedMax=PersistMonotonicMax(maxKey,currentLots);
+   double persistedMaxProfit=PersistMonotonicMax(maxProfitKey,currentMaxProfit);
+   double persistedMaxLots=PersistMonotonicMax(maxLotsKey,currentLots);
    if(!GlobalVariableCheck(minKey)||MathAbs(GlobalVariableGet(minKey)-persistedMin)>0.0000001)
       GlobalVariableSet(minKey,persistedMin);
-   if(!GlobalVariableCheck(maxKey)||MathAbs(GlobalVariableGet(maxKey)-persistedMax)>0.0000001)
-      GlobalVariableSet(maxKey,persistedMax);
+   if(!GlobalVariableCheck(maxProfitKey)||MathAbs(GlobalVariableGet(maxProfitKey)-persistedMaxProfit)>0.0000001)
+      GlobalVariableSet(maxProfitKey,persistedMaxProfit);
+   if(!GlobalVariableCheck(maxLotsKey)||MathAbs(GlobalVariableGet(maxLotsKey)-persistedMaxLots)>0.0000001)
+      GlobalVariableSet(maxLotsKey,persistedMaxLots);
 }
 
 void LoadPersistedStrategicState()
@@ -113,6 +117,7 @@ void LoadPersistedStrategicState()
    if(GlobalVariableCheck(StateKey("g_r10LastAction")))g_r10LastAction=(datetime)GlobalVariableGet(StateKey("g_r10LastAction"));
    if(GlobalVariableCheck(StateKey("g_r9HedgeActive")))g_r9HedgeActive=(GlobalVariableGet(StateKey("g_r9HedgeActive"))>0.5);
    if(GlobalVariableCheck(StateKey("PANEL_MIN_PROFIT")))g_panelMinProfit=GlobalVariableGet(StateKey("PANEL_MIN_PROFIT"));
+   if(GlobalVariableCheck(StateKey("PANEL_MAX_PROFIT")))g_panelMaxProfit=GlobalVariableGet(StateKey("PANEL_MAX_PROFIT"));
    if(GlobalVariableCheck(StateKey("MAX_ACCUM_LOTS")))g_panelMaxLots=GlobalVariableGet(StateKey("MAX_ACCUM_LOTS"));
    LoadPersistedR13State();
 }
