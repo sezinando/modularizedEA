@@ -7,7 +7,6 @@
 #include "../Core/EAGOLD_Execution.mqh"
 string EA_NAME="EAGOLD";string R10_MARKER_PREFIX="EAGOLD_R10_MARKER_";string ENGINE_MARKER_PREFIX="EAGOLD_ENGINE_";string STATE_PREFIX="EAGOLD_STATE_";bool g_r9HedgeActive=false;int g_r9ProcessedTickets[];datetime g_r10LastAction=0;string g_r1LastDecision="DISABLED";string g_r1LastReason="";datetime g_r1LastDecisionTime=0;bool g_r10RecoveryCycleActive=false;double g_r10RecoveryStartEquity=0.0;double g_r10RecoveryWorstEquity=0.0;EAGOLD_TickPolicy g_eagoldTickPolicy=EAGOLD_TICK_CONTINUE;
 #include "../Engines/EAGOLD_R10_Reconciliation.mqh"
-#include "../Core/EAGOLD_Persistence.mqh"
 
 double PointsToPrice(double points){return(points*Point);}double NormalizePrice(double price){return(NormalizeDouble(price,Digits));}double NormalizeLot(double lot){if(lot<Lot)lot=Lot;if(MaxOpenLot>0.0&&lot>MaxOpenLot)lot=MaxOpenLot;return(NormalizeDouble(lot,DigitsLots));}
 
@@ -22,6 +21,7 @@ void EAGOLD_ApplyActionResult(EAGOLD_ActionResult result,string engine,string ac
 #include "../Engines/EAGOLD_Lifecycle.mqh"
 #include "../Engines/EAGOLD_R1_Admission.mqh"
 #include "../Engines/EAGOLD_R13_Satellite.mqh"
+#include "../Core/EAGOLD_Persistence.mqh"
 #include "../UI/EAGOLD_ModularizationPanel.mqh"
 #include "../UI/EAGOLD_ChartBasketGuides.mqh"
 R13ObserverState g_r13Observer;
