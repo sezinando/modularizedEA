@@ -2,8 +2,9 @@
 #define EAGOLD_TRADING_GUARDS_MQH
 
 // Central admission policy for NEW broker orders.
-// Existing positions remain manageable: closing, deleting and modifying
-// existing orders are intentionally NOT blocked by these entry guards.
+// Existing market positions remain manageable. Pending orders are removed when
+// entry conditions are closed, because a pending order can otherwise be
+// activated by the broker without a new OrderSend() from the EA.
 
 bool EAGOLD_TradingWindowOpen()
 {
@@ -14,21 +15,17 @@ bool EAGOLD_TradingWindowOpen()
    int end=(TradeEndHour*60)+TradeEndMinute;
    int now=(TimeHour(TimeCurrent())*60)+TimeMinute(TimeCurrent());
 
-   // Equal start/end means full-day operation.
    if(start==end)
       return(true);
 
    if(start<end)
       return(now>=start && now<end);
 
-   // Overnight window, e.g. 22:00 -> 05:00.
    return(now>=start || now<end);
 }
 
 bool EAGOLD_SpreadAllowed()
 {
-   // Existing SpreadLimit is the canonical EAGOLD spread control.
-   // <= 0 means no spread restriction.
    if(SpreadLimit<=0)
       return(true);
 
@@ -60,6 +57,41 @@ bool EAGOLD_NewOrderAdmissionAllowed()
    }
 
    return(EAGOLD_SpreadAllowed());
+}
+
+// A pending order is a broker-side future entry. If the spread or trading
+// window becomes invalid after the pending was created, leaving it alive can
+// still create a NEW market position. Remove only EAGOLD-recognized pending
+// orders; market positions are never touched here.
+int EAGOLD_SuspendInvalidPendingEntries()
+{
+   bool windowOpen=EAGOLD_TradingWindowOpen();
+   bool spreadOpen=EAGOLD_SpreadAllowed();
+   if(windowOpen && spreadOpen)
+      return(0);
+
+   int deleted=0;
+   for(int i=OrdersTotal()-1;i>=0;i--)
+   {
+      if(!OrderSelect(i,SELECT_BY_POS,MODE_TRADES))continue;
+      if(!IsEAGOLDOrder())continue;
+      int type=OrderType();
+      if(type!=OP_BUYSTOP&&type!=OP_SELLSTOP)continue;
+      int ticket=OrderTicket();
+      ResetLastError();
+      if(OrderDelete(ticket))
+      {
+         deleted++;
+         Print(EA_NAME," ENTRY SUSPENDED: pending ticket=",ticket,
+               " removed because entry conditions are closed.");
+      }
+      else
+      {
+         Print(EA_NAME," ENTRY SUSPEND FAILED: pending ticket=",ticket,
+               " error=",GetLastError());
+      }
+   }
+   return(deleted);
 }
 
 #endif
