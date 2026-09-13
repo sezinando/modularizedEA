@@ -113,7 +113,58 @@ EAGOLD_ActionResult R13CloseAllTransactional(string reason,int &requestedCount,i
 
 void R13AddRecoveryCapital(double realized){if(realized<=0.0||R13RecoveryCapitalFraction<=0.0)return;double added=realized*R13RecoveryCapitalFraction;g_r13RecoveryCapitalAvailable+=added;Print(EA_NAME," R13 RECOVERY CAPITAL: realized=$",DoubleToString(realized,2)," added=$",DoubleToString(added,2)," available=$",DoubleToString(g_r13RecoveryCapitalAvailable,2));}
 
-EAGOLD_ActionResult R13TryFundMasterAdjustmentTransactional(double &usedCapital,double &reducedLots,double &realizedLoss){usedCapital=0.0;reducedLots=0.0;realizedLoss=0.0;if(!EnableR13MasterAdjustment||g_r13RecoveryCapitalAvailable<=0.0)return(EAGOLD_ACTION_BLOCKED);double exposureBefore=ExposureLots();if(exposureBefore<R13MinDirectionalImbalance)return(EAGOLD_ACTION_BLOCKED);int masterDirection=HeavyDirection();if(masterDirection<0)return(EAGOLD_ACTION_BLOCKED);bool completed=R10ProfitFundedAverageAdjustment(masterDirection,g_r13RecoveryCapitalAvailable,R13MasterAdjustmentMaxLots,usedCapital,reducedLots,realizedLoss);double exposureAfter=ExposureLots();if(completed){if(reducedLots<Lot||exposureAfter>=exposureBefore-0.00001){Print(EA_NAME," R13 -> R10 ADAPTER POSTCONDITION FAILED: expected exposure reduction. before=",DoubleToString(exposureBefore,DigitsLots)," after=",DoubleToString(exposureAfter,DigitsLots));if(exposureAfter<exposureBefore-0.00001)return(EAGOLD_ACTION_PARTIAL);return(EAGOLD_ACTION_FAILED);}g_r13RecoveryCapitalAvailable=MathMax(0.0,g_r13RecoveryCapitalAvailable-usedCapital);g_r13RecoveryCapitalUsed+=usedCapital;Print(EA_NAME," R13 -> R10 CAPITAL CONSUMED: side=",(masterDirection==OP_BUY?"BUY":"SELL")," reduced=",DoubleToString(reducedLots,DigitsLots)," loss=$",DoubleToString(MathAbs(realizedLoss),2)," used=$",DoubleToString(usedCapital,2)," remaining=$",DoubleToString(g_r13RecoveryCapitalAvailable,2));return(EAGOLD_ACTION_COMPLETED);}if(exposureAfter<exposureBefore-0.00001){Print(EA_NAME," R13 -> R10 ADAPTER PARTIAL: exposure reduced despite false legacy result. before=",DoubleToString(exposureBefore,DigitsLots)," after=",DoubleToString(exposureAfter,DigitsLots)," used=$",DoubleToString(usedCapital,2));if(usedCapital>0.0){g_r13RecoveryCapitalAvailable=MathMax(0.0,g_r13RecoveryCapitalAvailable-usedCapital);g_r13RecoveryCapitalUsed+=usedCapital;}return(EAGOLD_ACTION_PARTIAL);}return(EAGOLD_ACTION_FAILED);}
+EAGOLD_ActionResult R13TryFundMasterAdjustmentTransactional(double &usedCapital,double &reducedLots,double &realizedLoss){
+   usedCapital=0.0;reducedLots=0.0;realizedLoss=0.0;
+   if(!EnableR13MasterAdjustment||g_r13RecoveryCapitalAvailable<=0.0)return(EAGOLD_ACTION_BLOCKED);
+   double exposureBefore=ExposureLots();
+   if(exposureBefore<R13MinDirectionalImbalance)return(EAGOLD_ACTION_BLOCKED);
+   int masterDirection=HeavyDirection();
+   if(masterDirection<0)return(EAGOLD_ACTION_BLOCKED);
+
+   EAGOLD_ActionResult result=R10ProfitFundedAverageAdjustmentTransactional(
+      masterDirection,
+      g_r13RecoveryCapitalAvailable,
+      R13MasterAdjustmentMaxLots,
+      usedCapital,
+      reducedLots,
+      realizedLoss);
+
+   double exposureAfter=ExposureLots();
+
+   if(result==EAGOLD_ACTION_COMPLETED){
+      if(reducedLots<Lot||exposureAfter>=exposureBefore-0.00001){
+         Print(EA_NAME," R13 -> R10 ADAPTER POSTCONDITION FAILED: expected exposure reduction. before=",DoubleToString(exposureBefore,DigitsLots)," after=",DoubleToString(exposureAfter,DigitsLots));
+         if(exposureAfter<exposureBefore-0.00001){
+            if(usedCapital>0.0){
+               g_r13RecoveryCapitalAvailable=MathMax(0.0,g_r13RecoveryCapitalAvailable-usedCapital);
+               g_r13RecoveryCapitalUsed+=usedCapital;
+            }
+            return(EAGOLD_ACTION_PARTIAL);
+         }
+         return(EAGOLD_ACTION_FAILED);
+      }
+      g_r13RecoveryCapitalAvailable=MathMax(0.0,g_r13RecoveryCapitalAvailable-usedCapital);
+      g_r13RecoveryCapitalUsed+=usedCapital;
+      Print(EA_NAME," R13 -> R10 CAPITAL CONSUMED: side=",(masterDirection==OP_BUY?"BUY":"SELL")," reduced=",DoubleToString(reducedLots,DigitsLots)," loss=$",DoubleToString(MathAbs(realizedLoss),2)," used=$",DoubleToString(usedCapital,2)," remaining=$",DoubleToString(g_r13RecoveryCapitalAvailable,2));
+      return(EAGOLD_ACTION_COMPLETED);
+   }
+
+   if(result==EAGOLD_ACTION_PARTIAL){
+      if(usedCapital>0.0){
+         g_r13RecoveryCapitalAvailable=MathMax(0.0,g_r13RecoveryCapitalAvailable-usedCapital);
+         g_r13RecoveryCapitalUsed+=usedCapital;
+      }
+      Print(EA_NAME," R13 -> R10 TRANSACTION PARTIAL: reduced=",DoubleToString(reducedLots,DigitsLots)," loss=$",DoubleToString(MathAbs(realizedLoss),2)," used=$",DoubleToString(usedCapital,2)," exposureBefore=",DoubleToString(exposureBefore,DigitsLots)," exposureAfter=",DoubleToString(exposureAfter,DigitsLots));
+      return(EAGOLD_ACTION_PARTIAL);
+   }
+
+   if(result==EAGOLD_ACTION_FAILED){
+      Print(EA_NAME," R13 -> R10 TRANSACTION FAILED: exposureBefore=",DoubleToString(exposureBefore,DigitsLots)," exposureAfter=",DoubleToString(exposureAfter,DigitsLots));
+      return(EAGOLD_ACTION_FAILED);
+   }
+
+   return(result);
+}
 
 void R13ManageOpenPositions(int masterDirection,double masterExposure){int ownDirection=R13OwnDirection();double ownProfit=R13OwnProfit();if(R13CountOwnPositions()<=0)return;int required=R13ComplementaryDirection(masterDirection);if(masterExposure<R13MinDirectionalImbalance){if(!R13CloseWhenMasterFlat)return;int requestedCount=0,completedCount=0;double requestedLots=0.0,completedLots=0.0,realized=0.0;EAGOLD_ActionResult result=R13CloseAllTransactional("MASTER_FLAT",requestedCount,completedCount,requestedLots,completedLots,realized);EAGOLD_ApplyActionResult(result,"R13","MASTER_FLAT",ownDirection,completedLots);if(result==EAGOLD_ACTION_COMPLETED)R13AddRecoveryCapital(realized);return;}if(EnableR13DirectionalComplementarity&&required>=0&&ownDirection>=0&&ownDirection!=required){int requestedCount=0,completedCount=0;double requestedLots=0.0,completedLots=0.0,realized=0.0;EAGOLD_ActionResult result=R13CloseAllTransactional("MASTER_DIRECTION_CHANGED",requestedCount,completedCount,requestedLots,completedLots,realized);EAGOLD_ApplyActionResult(result,"R13","MASTER_DIRECTION_CHANGED",ownDirection,completedLots);if(result==EAGOLD_ACTION_COMPLETED)R13AddRecoveryCapital(realized);return;}if(R13ProfitTarget>0.0&&ownProfit>=R13ProfitTarget){int requestedCount=0,completedCount=0;double requestedLots=0.0,completedLots=0.0,realized=0.0;EAGOLD_ActionResult result=R13CloseAllTransactional("R13_PROFIT_TARGET",requestedCount,completedCount,requestedLots,completedLots,realized);EAGOLD_ApplyActionResult(result,"R13","R13_PROFIT_TARGET",ownDirection,completedLots);if(result==EAGOLD_ACTION_COMPLETED)R13AddRecoveryCapital(realized);return;}}
 
