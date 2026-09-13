@@ -1,12 +1,16 @@
 #ifndef EAGOLD_COUNTERFACTUAL_PATH_TELEMETRY_MQH
 #define EAGOLD_COUNTERFACTUAL_PATH_TELEMETRY_MQH
 
-// EAGOLD COUNTERFACTUAL PATH TELEMETRY v1.0
+// EAGOLD COUNTERFACTUAL PATH TELEMETRY v1.1
 // Observer-only, ticket-level, path-preserving telemetry for future
 // counterfactual Partial / BE / Runner / Basket-Trailing research.
 // MUST NOT submit, modify or close orders.
+// v1.1 adds deterministic file-open diagnostics and ensures the CSV is
+// created/headered even when the EA starts flat.
 
 long g_cfPathSequence=0;
+long g_cfPathRowsWritten=0;
+bool g_cfPathFileDiagnosticLogged=false;
 
 void EAGOLD_CounterfactualPathHeader(int handle)
 {
@@ -29,6 +33,36 @@ void EAGOLD_CounterfactualPathHeader(int handle)
       "BID","ASK");
 }
 
+int EAGOLD_CounterfactualPathOpenFile()
+{
+   ResetLastError();
+   int handle=FileOpen("EAGOLD_COUNTERFACTUAL_PATH.csv",FILE_CSV|FILE_READ|FILE_WRITE|FILE_SHARE_READ|FILE_SHARE_WRITE,';');
+   int error=GetLastError();
+   if(handle==INVALID_HANDLE)
+   {
+      Print("EAGOLD CF PATH: FileOpen FAILED error=",error,
+            " tester=",(IsTesting()?"1":"0"),
+            " data_path=",TerminalInfoString(TERMINAL_DATA_PATH),
+            " common_path=",TerminalInfoString(TERMINAL_COMMONDATA_PATH));
+      return(INVALID_HANDLE);
+   }
+
+   FileSeek(handle,0,SEEK_END);
+   EAGOLD_CounterfactualPathHeader(handle);
+
+   if(!g_cfPathFileDiagnosticLogged)
+   {
+      g_cfPathFileDiagnosticLogged=true;
+      Print("EAGOLD CF PATH: FileOpen OK file=EAGOLD_COUNTERFACTUAL_PATH.csv",
+            " tester=",(IsTesting()?"1":"0"),
+            " data_path=",TerminalInfoString(TERMINAL_DATA_PATH),
+            " common_path=",TerminalInfoString(TERMINAL_COMMONDATA_PATH),
+            " size_bytes=",FileSize(handle),
+            " rows_written=",g_cfPathRowsWritten);
+   }
+   return(handle);
+}
+
 string EAGOLD_CounterfactualPathTypeName(int type)
 {
    if(type==OP_BUY)return("BUY");
@@ -40,14 +74,17 @@ void EAGOLD_CounterfactualPathWrite(string phase)
 {
    if(!EnableCounterfactualPathTelemetry)return;
 
+   int handle=EAGOLD_CounterfactualPathOpenFile();
+   if(handle==INVALID_HANDLE)return;
+
    int buyCount=CountDirectionPositions(OP_BUY);
    int sellCount=CountDirectionPositions(OP_SELL);
-   if(buyCount+sellCount<=0)return;
-
-   int handle=FileOpen("EAGOLD_COUNTERFACTUAL_PATH.csv",FILE_CSV|FILE_READ|FILE_WRITE|FILE_SHARE_READ|FILE_SHARE_WRITE,';');
-   if(handle==INVALID_HANDLE){Print("EAGOLD CF PATH: FileOpen failed error=",GetLastError());return;}
-   FileSeek(handle,0,SEEK_END);
-   EAGOLD_CounterfactualPathHeader(handle);
+   if(buyCount+sellCount<=0)
+   {
+      FileFlush(handle);
+      FileClose(handle);
+      return;
+   }
 
    RefreshRates();
    double buyLots=DirectionLots(OP_BUY),sellLots=DirectionLots(OP_SELL);
@@ -94,10 +131,20 @@ void EAGOLD_CounterfactualPathWrite(string phase)
          IntegerToString(g_r12State.eventBoundaryTransitionCount),IntegerToString(g_r12State.eventBoundarySequenceCount),r12EventStart,
          r12EventChange,DoubleToString(g_r12State.eventBoundaryDurationSec,0),r12EventSequence,
          DoubleToString(Bid,Digits),DoubleToString(Ask,Digits));
+      g_cfPathRowsWritten++;
    }
-   FileFlush(handle);FileClose(handle);
+
+   FileFlush(handle);
+   if(g_cfPathRowsWritten==1 || (g_cfPathRowsWritten%1000)==0)
+      Print("EAGOLD CF PATH: rows_written=",g_cfPathRowsWritten," size_bytes=",FileSize(handle));
+   FileClose(handle);
 }
 
-void EAGOLD_CounterfactualPathReset(){g_cfPathSequence=0;}
+void EAGOLD_CounterfactualPathReset()
+{
+   g_cfPathSequence=0;
+   g_cfPathRowsWritten=0;
+   g_cfPathFileDiagnosticLogged=false;
+}
 
 #endif
