@@ -130,6 +130,7 @@ extern double EngineActionMarkerStackStepPips=20.0;
 double EngineActionMarkerOffsetPoints=100.0;
 input string INPUT_GROUP_COUNTERFACTUAL_TELEMETRY="=== 07A COUNTERFACTUAL PATH TELEMETRY ===";
 extern bool EnableCounterfactualPathTelemetry=true;
+extern int CounterfactualPathSampleSeconds=2;
 input string INPUT_GROUP_PANEL="=== 07 MODULAR PANEL / DEBUG ===";
 extern bool EnableModularizationPanel=true;
 extern bool EnableModularizationDebug=false;
