@@ -6,16 +6,20 @@
 // R13 uses a reserved Magic namespace, therefore it has dedicated Core wrappers
 // that enforce the same global trading/expiry policy without crossing the Master
 // ownership boundary enforced by IsEAGOLDOrder().
+//
+// Entry policy: all NEW broker orders pass through EAGOLD_NewOrderAdmissionAllowed().
+// Existing positions remain free to close, and pending orders remain free to be
+// deleted/modified, so an active basket can finish after the entry window closes.
 
 int SendPending(int type,double price,double lots,string comment)
 {
-   if(!EAGOLD_TradingAllowed()){Print(EA_NAME," ORDER BLOCKED: test validity expired on 30/12/2026.");return(-1);}
+   if(!EAGOLD_NewOrderAdmissionAllowed())return(-1);
    RefreshRates();double stopLevel=MarketInfo(Symbol(),MODE_STOPLEVEL)*Point;price=NormalizePrice(price);lots=NormalizeLot(lots);if(type==OP_BUYSTOP&&price<=Ask+stopLevel)return(-1);if(type==OP_SELLSTOP&&price>=Bid-stopLevel)return(-1);ResetLastError();int ticket=OrderSend(Symbol(),type,lots,price,0,0,0,comment,MagicNumber,0,clrNONE);if(ticket<0)Print(EA_NAME," OrderSend failed. type=",type," error=",GetLastError()," comment=",comment);else Print(EA_NAME," pending created. ticket=",ticket," type=",type," price=",DoubleToString(price,Digits)," lot=",DoubleToString(lots,DigitsLots)," comment=",comment);return(ticket);
 }
 
 int SendMarket(int type,double lots,string comment)
 {
-   if(!EAGOLD_TradingAllowed()){Print(EA_NAME," ORDER BLOCKED: test validity expired on 30/12/2026.");return(-1);}
+   if(!EAGOLD_NewOrderAdmissionAllowed())return(-1);
    RefreshRates();lots=NormalizeLot(lots);double price=(type==OP_BUY?Ask:Bid);ResetLastError();int ticket=OrderSend(Symbol(),type,lots,NormalizePrice(price),0,0,0,comment,MagicNumber,0,clrNONE);if(ticket<0)Print(EA_NAME," market send failed. type=",type," error=",GetLastError()," comment=",comment);else Print(EA_NAME," market created. ticket=",ticket," type=",type," lot=",DoubleToString(lots,DigitsLots)," comment=",comment);return(ticket);
 }
 
@@ -23,7 +27,7 @@ int SendMarket(int type,double lots,string comment)
 // from IsEAGOLDOrder(), which deliberately excludes R13 from the Master set.
 int SendMarketByMagic(int type,double lots,string comment,int magic)
 {
-   if(!EAGOLD_TradingAllowed()){Print(EA_NAME," ORDER BLOCKED: test validity expired on 30/12/2026.");return(-1);}
+   if(!EAGOLD_NewOrderAdmissionAllowed())return(-1);
    if(magic<0){Print(EA_NAME," market send blocked: invalid magic.");return(-1);}
    if(type!=OP_BUY&&type!=OP_SELL)return(-1);
    RefreshRates();
