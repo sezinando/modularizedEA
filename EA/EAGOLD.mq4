@@ -22,7 +22,6 @@ void EAGOLD_ApplyActionResult(EAGOLD_ActionResult result,string engine,string ac
 #include "../Engines/EAGOLD_Lifecycle.mqh"
 #include "../Engines/EAGOLD_R1_Admission.mqh"
 #include "../Core/EAGOLD_R1_AtomicAdmission.mqh"
-void R7_KeepAliveMarkerShim();
 #include "../Core/EAGOLD_R7_KeepAlive.mqh"
 #include "../Engines/EAGOLD_R13_Satellite.mqh"
 #include "../Core/EAGOLD_Persistence.mqh"
