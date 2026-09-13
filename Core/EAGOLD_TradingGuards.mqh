@@ -2,8 +2,8 @@
 #define EAGOLD_TRADING_GUARDS_MQH
 
 // Central admission policy for NEW broker orders.
-// Closing, deleting and modifying existing orders remain allowed so an active
-// basket can finish even when the entry window has ended or spread is high.
+// Existing positions remain manageable: closing, deleting and modifying
+// existing orders are intentionally NOT blocked by these entry guards.
 
 bool EAGOLD_TradingWindowOpen()
 {
@@ -14,12 +14,10 @@ bool EAGOLD_TradingWindowOpen()
    int end=(TradeEndHour*60)+TradeEndMinute;
    int now=(TimeHour(TimeCurrent())*60)+TimeMinute(TimeCurrent());
 
-   // Equal start/end means a full-day window. This avoids an accidental
-   // zero-minute window when both inputs are left at 00:00.
+   // Equal start/end means full-day operation.
    if(start==end)
       return(true);
 
-   // Normal intraday window, e.g. 09:00 -> 17:00.
    if(start<end)
       return(now>=start && now<end);
 
@@ -29,17 +27,19 @@ bool EAGOLD_TradingWindowOpen()
 
 bool EAGOLD_SpreadAllowed()
 {
-   if(!EnableSpreadFilter)
+   // Existing SpreadLimit is the canonical EAGOLD spread control.
+   // <= 0 means no spread restriction.
+   if(SpreadLimit<=0)
       return(true);
 
    RefreshRates();
    double spreadPoints=(Ask-Bid)/Point;
-   if(spreadPoints<=MaxSpreadPoints)
+   if(spreadPoints<=SpreadLimit)
       return(true);
 
    Print(EA_NAME,
          " ENTRY BLOCKED: spread=",DoubleToString(spreadPoints,1),
-         " points > MaxSpreadPoints=",DoubleToString(MaxSpreadPoints,1));
+         " points > SpreadLimit=",IntegerToString(SpreadLimit));
    return(false);
 }
 
