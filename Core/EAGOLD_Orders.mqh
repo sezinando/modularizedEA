@@ -1,12 +1,12 @@
 #ifndef EAGOLD_ORDERS_MQH
 #define EAGOLD_ORDERS_MQH
 
-// EAGOLD order ownership and exposure measurement.
-// Master ownership is Symbol + dedicated MagicNumber.
-// Legacy MagicNumber == -1 can be explicitly reattached for the current
-// symbol only when EnableLegacyReattach=true. It is never an account-wide
-// ownership mode.
-// R13 owns a reserved Magic namespace and is never part of the Master universe.
+// EAGOLD order recognition supports two explicit modes:
+// 1) Magic mode: manage only orders matching MagicNumber on this symbol.
+// 2) Symbol/PAR mode: manage all orders on this symbol regardless of Magic,
+//    except the reserved R13 Magic namespace.
+// This preserves strict Magic ownership by default while allowing an operator
+// to deliberately reattach an existing PAR/basket with mixed Magic numbers.
 // Comment is observational only and never establishes ownership.
 
 bool IsR13Order(){
@@ -32,7 +32,7 @@ int CountLegacyMagicOrders(){
    return(count);
 }
 
-bool EAGOLDLegacyReattachAllowed(){
+bool EAGOLDAllSymbolRecognitionAllowed(){
    return(EnableLegacyReattach);
 }
 
@@ -49,18 +49,30 @@ bool EAGOLDValidateOwnershipConfiguration(){
       Print(EA_NAME," OWNERSHIP BLOCKED: Master MagicNumber collides with R13 MagicNumber. Magic=",MagicNumber);
       return(false);
    }
-   if(RequireCleanLegacyOwnership && !EAGOLDLegacyReattachAllowed()){
+
+   if(EAGOLDAllSymbolRecognitionAllowed())
+   {
+      int symbolOrders=0;
+      for(int i=OrdersTotal()-1;i>=0;i--)
+      {
+         if(!OrderSelect(i,SELECT_BY_POS,MODE_TRADES))continue;
+         if(OrderSymbol()!=Symbol())continue;
+         if(OrderMagicNumber()==R13MagicNumber)continue;
+         symbolOrders++;
+      }
+      Print(EA_NAME," PAR REATTACH MODE ENABLED: ",symbolOrders," open order(s) on ",Symbol()," will be recognized regardless of MagicNumber. R13 Magic=",R13MagicNumber," remains isolated.");
+      return(true);
+   }
+
+   if(RequireCleanLegacyOwnership){
       int legacy=CountLegacyMagicOrders();
       if(legacy>0){
-         Print(EA_NAME," OWNERSHIP BLOCKED: ",legacy," open order(s) on ",Symbol()," still use legacy MagicNumber=-1. Enable EnableLegacyReattach only for an intentional legacy recovery session.");
+         Print(EA_NAME," OWNERSHIP BLOCKED: ",legacy," open order(s) on ",Symbol()," still use legacy MagicNumber=-1. Use PAR reattach mode only when this entire symbol basket is intended for EAGOLD.");
          return(false);
       }
    }
-   if(EAGOLDLegacyReattachAllowed()){
-      int legacyReattach=CountLegacyMagicOrders();
-      if(legacyReattach>0)
-         Print(EA_NAME," LEGACY REATTACH ENABLED: ",legacyReattach," order(s) with MagicNumber=-1 on ",Symbol()," will be included in the EAGOLD Master view for this chart only.");
-   }
+
+   Print(EA_NAME," MAGIC OWNERSHIP MODE: recognizing only MagicNumber=",MagicNumber," on ",Symbol(),". R13 Magic=",R13MagicNumber," remains isolated.");
    return(true);
 }
 
@@ -68,20 +80,21 @@ bool IsEAGOLDOrder(){
    if(OrderSymbol()!=Symbol())return(false);
    // R13 uses a reserved Magic and is never part of the Master universe.
    if(OrderMagicNumber()==R13MagicNumber)return(false);
-   // Strict dedicated ownership is the default.
    if(MagicNumber<=0)return(false);
-   if(OrderMagicNumber()==MagicNumber)return(true);
-   // Explicit legacy reattach: -1 is accepted only for the current symbol
-   // and only while the operator has deliberately enabled the reattach mode.
-   if(EAGOLDLegacyReattachAllowed() && OrderMagicNumber()==-1)return(true);
-   return(false);
+
+   // Explicit PAR/Symbol mode: every open order on the current symbol is
+   // recognized, independent of MagicNumber, except R13 above.
+   if(EAGOLDAllSymbolRecognitionAllowed())return(true);
+
+   // Default Magic mode: only the configured EAGOLD Magic is recognized.
+   return(OrderMagicNumber()==MagicNumber);
 }
 
 int CountOrdersByType(int type){int count=0;for(int i=OrdersTotal()-1;i>=0;i--){if(!OrderSelect(i,SELECT_BY_POS,MODE_TRADES))continue;if(!IsEAGOLDOrder())continue;if(OrderType()==type)count++;}return(count);}
 
-int CountDirectionPositions(int direction){return(CountOrdersByType(direction==OP_BUY?OP_BUY:OP_SELL));}
+int CountDirectionPositions(int direction){return(CountOrdersByType(direction==OP_BUY?OP_BUY:OP_SELL);}
 
-int CountDirectionPending(int direction){return(CountOrdersByType(direction==OP_BUY?OP_BUYSTOP:OP_SELLSTOP));}
+int CountDirectionPending(int direction){return(CountOrdersByType(direction==OP_BUY?OP_BUYSTOP:OP_SELLSTOP);}
 
 int CountEAGOLDOrders(){int count=0;for(int i=OrdersTotal()-1;i>=0;i--){if(!IsEAGOLDOrder())continue;count++;}return(count);}
 
