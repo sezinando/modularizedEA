@@ -10,9 +10,6 @@ double R10RealizedTicketsNet(int &tickets[]){double total=0.0;for(int i=0;i<Arra
 void CreateR10VisualMarker(int targetDirection,double reducedLots,double realizedMoney,double beforeExposure,double afterExposure,double beforeGross,double afterGross){if(!EnableR10VisualMarker||reducedLots<Lot)return;RefreshRates();double price=NormalizePrice((Bid+Ask)/2.0);string side=(targetDirection==OP_BUY?"BUY":"SELL");color markerColor=(targetDirection==OP_BUY?R10BuyMarkerColor:R10SellMarkerColor);string base=R10_MARKER_PREFIX+IntegerToString(GetTickCount())+"_"+IntegerToString(MathRand());string text="RD "+DoubleToString(reducedLots,DigitsLots);datetime stamp=TimeCurrent();if(ObjectCreate(0,base,OBJ_TEXT,0,stamp,NormalizePrice(price+PointsToPrice(R10MarkerOffsetPoints)))){ObjectSetString(0,base,OBJPROP_TEXT,text);ObjectSetString(0,base,OBJPROP_FONT,"Segoe UI Semibold");ObjectSetInteger(0,base,OBJPROP_FONTSIZE,R10MarkerFontSize);ObjectSetInteger(0,base,OBJPROP_COLOR,markerColor);ObjectSetInteger(0,base,OBJPROP_ANCHOR,ANCHOR_LEFT_UPPER);ObjectSetInteger(0,base,OBJPROP_SELECTABLE,false);ObjectSetInteger(0,base,OBJPROP_SELECTED,false);ObjectSetInteger(0,base,OBJPROP_HIDDEN,false);ObjectSetInteger(0,base,OBJPROP_BACK,false);}ChartRedraw(0);}
 bool ReduceDirectionByLots(int direction,double lotsToReduce,double &realizedMoney){realizedMoney=0.0;if(lotsToReduce<Lot)return(false);int type=(direction==OP_BUY?OP_BUY:OP_SELL);int tickets[];ArrayResize(tickets,0);double ticketLots[];ArrayResize(ticketLots,0);for(int i=OrdersTotal()-1;i>=0;i--){if(!OrderSelect(i,SELECT_BY_POS,MODE_TRADES))continue;if(!IsEAGOLDOrder()||OrderType()!=type)continue;int n=ArraySize(tickets);ArrayResize(tickets,n+1);ArrayResize(ticketLots,n+1);tickets[n]=OrderTicket();ticketLots[n]=OrderLots();}for(int a=0;a<ArraySize(tickets)-1;a++)for(int b=a+1;b<ArraySize(tickets);b++)if(ticketLots[b]>ticketLots[a]){int ti=tickets[a];tickets[a]=tickets[b];tickets[b]=ti;double tl=ticketLots[a];ticketLots[a]=ticketLots[b];ticketLots[b]=tl;}double remaining=NormalizeDouble(lotsToReduce,DigitsLots);bool changed=false;for(int j=0;j<ArraySize(tickets)&&remaining>=Lot;j++){if(!OrderSelect(tickets[j],SELECT_BY_TICKET,MODE_TRADES))continue;if(!IsEAGOLDOrder()||OrderType()!=type)continue;double available=OrderLots();double closeLots=NormalizeDouble(MathMin(available,remaining),DigitsLots);if(closeLots<Lot)continue;double money=0.0;if(CloseMarketOrderLots(tickets[j],closeLots,money)){remaining=NormalizeDouble(remaining-closeLots,DigitsLots);realizedMoney+=money;changed=true;}}if(changed&&remaining>=Lot)Print(EA_NAME," R10 PARTIAL REDUCTION: side=",(direction==OP_BUY?"BUY":"SELL")," requested=",DoubleToString(lotsToReduce,DigitsLots)," realizedLots=",DoubleToString(lotsToReduce-remaining,DigitsLots)," remaining=",DoubleToString(remaining,DigitsLots)," realizedMoney=$",DoubleToString(realizedMoney,2));return(changed&&remaining<Lot);}
 
-// Transactional profit-funded average adjustment. The broker mutation is
-// represented by an explicit ActionResult and the capital constraint is
-// evaluated against the amount actually realized by the close operation.
 EAGOLD_ActionResult R10ProfitFundedAverageAdjustmentTransactional(int targetDirection,double availableCapital,double maxLots,double &usedCapital,double &reducedLots,double &realizedLoss)
 {
    usedCapital=0.0;reducedLots=0.0;realizedLoss=0.0;
@@ -49,29 +46,29 @@ EAGOLD_ActionResult R10ProfitFundedAverageAdjustmentTransactional(int targetDire
    if(!CloseMarketOrderLots(ticket,closeLots,money))
       return(EAGOLD_ACTION_FAILED);
 
-   // The close has already changed broker state. Never report BLOCKED/FAILED
-   // as NO_ACTION after a successful broker mutation. Measure the actual loss.
+   realizedLoss=money;
+   reducedLots=closeLots;
+   usedCapital=(money<0.0?MathAbs(money):0.0);
+   double afterExposure=ExposureLots();
+   double afterGross=DirectionLots(OP_BUY)+DirectionLots(OP_SELL);
+
+   // A broker mutation occurred. Therefore a non-COMPLETED outcome must be
+   // explicitly PARTIAL/FAILED and must not be interpreted as no action.
    if(money>=0.0)
    {
-      usedCapital=0.0;
-      reducedLots=closeLots;
-      double afterExposureUnexpected=ExposureLots();
-      if(afterExposureUnexpected<beforeExposure-0.00001)
+      if(afterExposure<beforeExposure-0.00001)
+      {
+         Print(EA_NAME," R10 AVG ADJUSTMENT UNEXPECTED NON-LOSS CLOSE: realized=$",DoubleToString(money,2)," reducedLots=",DoubleToString(closeLots,DigitsLots));
          return(EAGOLD_ACTION_PARTIAL);
+      }
       return(EAGOLD_ACTION_FAILED);
    }
 
-   realizedLoss=money;
-   usedCapital=MathAbs(money);
-   reducedLots=closeLots;
-   double afterExposure=ExposureLots();
-   double afterGross=DirectionLots(OP_BUY)+DirectionLots(OP_SELL);
    if(afterExposure>beforeExposure+0.00001)
       return(EAGOLD_ACTION_PARTIAL);
 
-   // Capital contract: close size was admitted using availableCapital, but
-   // broker economics are authoritative. Any actual consumption above the
-   // authorized capital is an explicit partial outcome, not silent success.
+   // Broker economics are authoritative. The admission calculation only
+   // limits requested size; actual realized loss is the amount consumed.
    if(usedCapital>availableCapital+0.01)
    {
       Print(EA_NAME," R10 AVG ADJUSTMENT CAPITAL OVERSHOOT: authorized=$",DoubleToString(availableCapital,2)," actual=$",DoubleToString(usedCapital,2));
@@ -85,8 +82,8 @@ EAGOLD_ActionResult R10ProfitFundedAverageAdjustmentTransactional(int targetDire
    return(EAGOLD_ACTION_COMPLETED);
 }
 
-// Compatibility wrapper retained for legacy callers. New economic callers
-// must use the transactional function above.
+// Legacy wrapper retained for source compatibility. It intentionally returns
+// true only for a fully completed transaction.
 bool R10ProfitFundedAverageAdjustment(int targetDirection,double availableCapital,double maxLots,double &usedCapital,double &reducedLots,double &realizedLoss)
 {
    EAGOLD_ActionResult result=R10ProfitFundedAverageAdjustmentTransactional(targetDirection,availableCapital,maxLots,usedCapital,reducedLots,realizedLoss);
@@ -150,7 +147,6 @@ bool Rule10Reduce(int targetDirection)
    return(true);
 }
 
-// Transactional adapter retained for callers that need an explicit outcome.
 EAGOLD_ActionResult Rule10ReduceTransactional(int targetDirection)
 {
    if(!EnableR10Reduce||R10MinExposureLots<=0.0)return(EAGOLD_ACTION_BLOCKED);
