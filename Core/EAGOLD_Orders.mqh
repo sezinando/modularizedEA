@@ -1,11 +1,11 @@
 #ifndef EAGOLD_ORDERS_MQH
 #define EAGOLD_ORDERS_MQH
 
-// Extracted from authoritative EAGOLD v0.106.
-// Stage 1: order ownership, counting and exposure measurement.
-// Master ownership is strictly Symbol + Magic. MagicNumber must be a dedicated
-// EAGOLD identifier; the previous MagicNumber == -1 ALL SYMBOL ORDERS mode is
-// intentionally rejected for live ownership.
+// EAGOLD order ownership and exposure measurement.
+// Master ownership is Symbol + dedicated MagicNumber.
+// Legacy MagicNumber == -1 can be explicitly reattached for the current
+// symbol only when EnableLegacyReattach=true. It is never an account-wide
+// ownership mode.
 // R13 owns a reserved Magic namespace and is never part of the Master universe.
 // Comment is observational only and never establishes ownership.
 
@@ -32,6 +32,10 @@ int CountLegacyMagicOrders(){
    return(count);
 }
 
+bool EAGOLDLegacyReattachAllowed(){
+   return(EnableLegacyReattach);
+}
+
 bool EAGOLDValidateOwnershipConfiguration(){
    if(MagicNumber<=0){
       Print(EA_NAME," OWNERSHIP BLOCKED: Master MagicNumber must be > 0. Current=",MagicNumber);
@@ -45,12 +49,17 @@ bool EAGOLDValidateOwnershipConfiguration(){
       Print(EA_NAME," OWNERSHIP BLOCKED: Master MagicNumber collides with R13 MagicNumber. Magic=",MagicNumber);
       return(false);
    }
-   if(RequireCleanLegacyOwnership){
+   if(RequireCleanLegacyOwnership && !EAGOLDLegacyReattachAllowed()){
       int legacy=CountLegacyMagicOrders();
       if(legacy>0){
-         Print(EA_NAME," OWNERSHIP BLOCKED: ",legacy," open order(s) on ",Symbol()," still use legacy MagicNumber=-1. Flatten/isolate them before enabling EAGOLD with MagicNumber=",MagicNumber,".");
+         Print(EA_NAME," OWNERSHIP BLOCKED: ",legacy," open order(s) on ",Symbol()," still use legacy MagicNumber=-1. Enable EnableLegacyReattach only for an intentional legacy recovery session.");
          return(false);
       }
+   }
+   if(EAGOLDLegacyReattachAllowed()){
+      int legacyReattach=CountLegacyMagicOrders();
+      if(legacyReattach>0)
+         Print(EA_NAME," LEGACY REATTACH ENABLED: ",legacyReattach," order(s) with MagicNumber=-1 on ",Symbol()," will be included in the EAGOLD Master view for this chart only.");
    }
    return(true);
 }
@@ -59,9 +68,13 @@ bool IsEAGOLDOrder(){
    if(OrderSymbol()!=Symbol())return(false);
    // R13 uses a reserved Magic and is never part of the Master universe.
    if(OrderMagicNumber()==R13MagicNumber)return(false);
-   // Strict ownership: EAGOLD Master manages only its dedicated Magic.
+   // Strict dedicated ownership is the default.
    if(MagicNumber<=0)return(false);
-   return(OrderMagicNumber()==MagicNumber);
+   if(OrderMagicNumber()==MagicNumber)return(true);
+   // Explicit legacy reattach: -1 is accepted only for the current symbol
+   // and only while the operator has deliberately enabled the reattach mode.
+   if(EAGOLDLegacyReattachAllowed() && OrderMagicNumber()==-1)return(true);
+   return(false);
 }
 
 int CountOrdersByType(int type){int count=0;for(int i=OrdersTotal()-1;i>=0;i--){if(!OrderSelect(i,SELECT_BY_POS,MODE_TRADES))continue;if(!IsEAGOLDOrder())continue;if(OrderType()==type)count++;}return(count);}
