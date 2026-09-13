@@ -1,6 +1,6 @@
 #ifndef EAGOLD_CONFIG_MQH
 #define EAGOLD_CONFIG_MQH
-#define EAGOLD_VERSION "0.110"
+#define EAGOLD_VERSION "0.111"
 #define EAGOLD_R13_DEFAULT_COMMENT "EAGOLD_RECOVERY_SATELLITE"
 #define EAGOLD_EXPIRY_DATE D'2026.12.31 00:00'
 double g_panelMinProfit=0.0; double g_panelMaxProfit=0.0; double g_panelMaxLots=0.0; bool g_panelInitialized=false; bool EAGOLD_TradingAllowed(){return(TimeCurrent()<EAGOLD_EXPIRY_DATE);}
