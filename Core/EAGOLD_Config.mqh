@@ -1,13 +1,13 @@
 #ifndef EAGOLD_CONFIG_MQH
 #define EAGOLD_CONFIG_MQH
-#define EAGOLD_VERSION "0.115"
+#define EAGOLD_VERSION "0.116"
 #define EAGOLD_R13_DEFAULT_COMMENT "EAGOLD_RECOVERY_SATELLITE"
 #define EAGOLD_EXPIRY_DATE D'2026.12.31 00:00'
 double g_panelMinProfit=0.0; double g_panelMaxProfit=0.0; double g_panelMaxLots=0.0; bool g_panelInitialized=false; bool EAGOLD_TradingAllowed(){return(TimeCurrent()<EAGOLD_EXPIRY_DATE);}
 input string INPUT_GROUP_GENERAL="=== 01 GENERAL / IDENTITY ==="; extern int MagicNumber=1101; extern bool RequireCleanLegacyOwnership=true; extern bool EnableLegacyReattach=false;
 input string INPUT_GROUP_MONEY="=== 02 CORE MONEY / LOT PROGRESSION ==="; extern double Lot=0.01; extern double Multiplier=1.10; extern int DigitsLots=2; extern double LotIncrement=0.02; extern double MaxOpenLot=3.00; extern double TakeProfit=5.00; extern double SellProfit=30.00; extern double BasketLoss=100.00; extern int SpreadLimit=100; extern int WaitSeconds=0;
 input string INPUT_GROUP_GRID="=== 02A CORE GRID / DISTANCES ==="; extern double FirstStep=160.0; extern double MiniGrid1=320.0; extern double SmartGrid1=280.0; extern double RecoveryMinDistance=340.0; extern double MiniGrid2=80.0; extern double SmartGrid2=60.0; extern double PendingStepTrail=50.0; extern double BasketRestartStep=160.0; extern int MaxTrades=2000; extern bool EnableCloseBy=true; extern double BuyProgressionTolerance=10.0;
-input string INPUT_GROUP_ENTRY_GUARDS="=== 02B / ENTRY TIME + SPREAD GUARDS ==="; extern bool EnableTradingTimeWindow=false; extern int TradeStartHour=0; extern int TradeStartMinute=0; extern int TradeEndHour=23; extern int TradeEndMinute=59; extern bool EnableSpreadFilter=false; extern double MaxSpreadPoints=100.0;
+input string INPUT_GROUP_ENTRY_GUARDS="=== 02B / ENTRY TIME + SPREAD GUARDS ==="; extern bool EnableTradingTimeWindow=false; extern int TradeStartHour=0; extern int TradeStartMinute=0; extern int TradeEndHour=23; extern int TradeEndMinute=59;
 input string INPUT_GROUP_R1_ADMISSION="=== 03 R1 / FIRST ADMISSION CONTROL ==="; extern bool EnableR1AdmissionGate=false; extern bool EnableR1BrokerGuard=false; extern bool EnableR1LotGuard=false; extern bool EnableR1MarginGuard=false; extern bool EnableR1TradePermissionGuard=false; extern double R1BrokerSafetyBufferPoints=0.0; extern double R1MinFreeMarginAfterOrder=0.0; extern bool EnableR1DecisionLog=true;
 input string INPUT_GROUP_LIFECYCLE="=== 03 R4 / R5 / R7 LIFECYCLE ==="; input string INPUT_GROUP_GLOBAL_TRAIL="=== 03 GLOBAL STOP TRAIL CONTROL ==="; extern bool EnableGlobalStopTrail=true; extern double GlobalStopTrailCooldownSeconds=0.0; extern double GlobalStopTrailMinStepPoints=0.0;
 input string INPUT_GROUP_BRX="=== 04 BRX / BASKET REALIZATION ==="; extern bool EnableBasketRealization=true; extern int BRXRealizationMode=3; extern double BRXDirectionalMinProfit=5.00; extern double BRXBidirectionalMinProfit=5.00; extern double BRXRealizationSafetyBuffer=5.00; extern bool BRXRequireWeightedBE=false; extern double BRXWeightedBEBufferPoints=0.0;
