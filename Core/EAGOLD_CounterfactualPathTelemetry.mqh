@@ -1,16 +1,27 @@
 #ifndef EAGOLD_COUNTERFACTUAL_PATH_TELEMETRY_MQH
 #define EAGOLD_COUNTERFACTUAL_PATH_TELEMETRY_MQH
 
-// EAGOLD COUNTERFACTUAL PATH TELEMETRY v1.1
+// EAGOLD COUNTERFACTUAL PATH TELEMETRY v1.2
 // Observer-only, ticket-level, path-preserving telemetry for future
 // counterfactual Partial / BE / Runner / Basket-Trailing research.
 // MUST NOT submit, modify or close orders.
-// v1.1 adds deterministic file-open diagnostics and ensures the CSV is
-// created/headered even when the EA starts flat.
+// v1.2 reduces tester I/O by sampling the path at a configurable interval,
+// forcing writes on structural state changes, keeping the file handle open,
+// and flushing periodically instead of on every tick.
 
 long g_cfPathSequence=0;
 long g_cfPathRowsWritten=0;
 bool g_cfPathFileDiagnosticLogged=false;
+int g_cfPathFileHandle=INVALID_HANDLE;
+datetime g_cfPathLastWriteTime=0;
+long g_cfPathLastEngineActionSequence=-1;
+long g_cfPathLastEventSequence=-1;
+int g_cfPathLastBuyCount=-1;
+int g_cfPathLastSellCount=-1;
+double g_cfPathLastBuyLots=-1.0;
+double g_cfPathLastSellLots=-1.0;
+int g_cfPathLastRegime=-1;
+int g_cfPathWritesSinceFlush=0;
 
 void EAGOLD_CounterfactualPathHeader(int handle)
 {
@@ -35,10 +46,12 @@ void EAGOLD_CounterfactualPathHeader(int handle)
 
 int EAGOLD_CounterfactualPathOpenFile()
 {
+   if(g_cfPathFileHandle!=INVALID_HANDLE)return(g_cfPathFileHandle);
+
    ResetLastError();
-   int handle=FileOpen("EAGOLD_COUNTERFACTUAL_PATH.csv",FILE_CSV|FILE_READ|FILE_WRITE|FILE_SHARE_READ|FILE_SHARE_WRITE,';');
+   g_cfPathFileHandle=FileOpen("EAGOLD_COUNTERFACTUAL_PATH.csv",FILE_CSV|FILE_READ|FILE_WRITE|FILE_SHARE_READ|FILE_SHARE_WRITE,';');
    int error=GetLastError();
-   if(handle==INVALID_HANDLE)
+   if(g_cfPathFileHandle==INVALID_HANDLE)
    {
       Print("EAGOLD CF PATH: FileOpen FAILED error=",error,
             " tester=",(IsTesting()?"1":"0"),
@@ -47,8 +60,8 @@ int EAGOLD_CounterfactualPathOpenFile()
       return(INVALID_HANDLE);
    }
 
-   FileSeek(handle,0,SEEK_END);
-   EAGOLD_CounterfactualPathHeader(handle);
+   FileSeek(g_cfPathFileHandle,0,SEEK_END);
+   EAGOLD_CounterfactualPathHeader(g_cfPathFileHandle);
 
    if(!g_cfPathFileDiagnosticLogged)
    {
@@ -57,10 +70,19 @@ int EAGOLD_CounterfactualPathOpenFile()
             " tester=",(IsTesting()?"1":"0"),
             " data_path=",TerminalInfoString(TERMINAL_DATA_PATH),
             " common_path=",TerminalInfoString(TERMINAL_COMMONDATA_PATH),
-            " size_bytes=",FileSize(handle),
-            " rows_written=",g_cfPathRowsWritten);
+            " size_bytes=",FileSize(g_cfPathFileHandle),
+            " rows_written=",g_cfPathRowsWritten,
+            " sample_seconds=",CounterfactualPathSampleSeconds);
    }
-   return(handle);
+   return(g_cfPathFileHandle);
+}
+
+void EAGOLD_CounterfactualPathCloseFile()
+{
+   if(g_cfPathFileHandle==INVALID_HANDLE)return;
+   FileFlush(g_cfPathFileHandle);
+   FileClose(g_cfPathFileHandle);
+   g_cfPathFileHandle=INVALID_HANDLE;
 }
 
 string EAGOLD_CounterfactualPathTypeName(int type)
@@ -68,6 +90,30 @@ string EAGOLD_CounterfactualPathTypeName(int type)
    if(type==OP_BUY)return("BUY");
    if(type==OP_SELL)return("SELL");
    return("OTHER");
+}
+
+bool EAGOLD_CounterfactualPathStateChanged(int buyCount,int sellCount,double buyLots,double sellLots,int regime,long eventSeq,long engineActionSeq)
+{
+   if(g_cfPathLastBuyCount<0)return(true);
+   if(buyCount!=g_cfPathLastBuyCount||sellCount!=g_cfPathLastSellCount)return(true);
+   if(MathAbs(buyLots-g_cfPathLastBuyLots)>0.0000001||MathAbs(sellLots-g_cfPathLastSellLots)>0.0000001)return(true);
+   if(regime!=g_cfPathLastRegime)return(true);
+   if(eventSeq!=g_cfPathLastEventSequence)return(true);
+   if(engineActionSeq!=g_cfPathLastEngineActionSequence)return(true);
+   return(false);
+}
+
+bool EAGOLD_CounterfactualPathShouldWrite(string phase,int buyCount,int sellCount,double buyLots,double sellLots,int regime,long eventSeq,long engineActionSeq)
+{
+   if(phase=="INIT")return(true);
+   if(EAGOLD_CounterfactualPathStateChanged(buyCount,sellCount,buyLots,sellLots,regime,eventSeq,engineActionSeq))return(true);
+
+   int sampleSeconds=CounterfactualPathSampleSeconds;
+   if(sampleSeconds<1)sampleSeconds=1;
+   datetime now=TimeCurrent();
+   if(g_cfPathLastWriteTime==0)return(true);
+   if((long)(now-g_cfPathLastWriteTime)>=sampleSeconds)return(true);
+   return(false);
 }
 
 void EAGOLD_CounterfactualPathWrite(string phase)
@@ -81,8 +127,8 @@ void EAGOLD_CounterfactualPathWrite(string phase)
    int sellCount=CountDirectionPositions(OP_SELL);
    if(buyCount+sellCount<=0)
    {
-      FileFlush(handle);
-      FileClose(handle);
+      // Keep INIT/flat creation lightweight; a terminal flat transition is
+      // represented by the last populated POST_ACTION row and event ledger.
       return;
    }
 
@@ -94,7 +140,13 @@ void EAGOLD_CounterfactualPathWrite(string phase)
    double realizedCycle=(g_excursionActive?realizedTotal-g_excursionStartRealized:0.0);
    string cycleId=(g_excursionActive?g_excursionCycleId:"");
    string cycleActive=(g_excursionActive?"1":"0");
-   int eventSeq=(g_excursionActive?g_excursionRealizationSequence:0);
+   long eventSeq=(g_excursionActive?g_excursionRealizationSequence:0);
+   long engineActionSeq=(long)g_excursionSequence;
+   int regime=(g_r12State.valid?g_r12State.regime:-1);
+
+   if(!EAGOLD_CounterfactualPathShouldWrite(phase,buyCount,sellCount,buyLots,sellLots,regime,eventSeq,engineActionSeq))
+      return;
+
    string r12Valid=(g_r12State.valid?"1":"0");
    string r12Regime=(g_r12State.valid?EAGOLD_R12_RegimeName(g_r12State.regime):"UNKNOWN");
    string r12Previous=(g_r12State.valid?EAGOLD_R12_RegimeName(g_r12State.previousRegime):"UNKNOWN");
@@ -104,6 +156,7 @@ void EAGOLD_CounterfactualPathWrite(string phase)
    string r12EventStart=(g_r12State.valid?TimeToString(g_r12State.eventBoundaryStartTime,TIME_DATE|TIME_SECONDS):"");
    string r12EventChange=(g_r12State.valid?TimeToString(g_r12State.eventBoundaryLastChangeTime,TIME_DATE|TIME_SECONDS):"");
 
+   int rowsThisWrite=0;
    for(int i=OrdersTotal()-1;i>=0;i--)
    {
       if(!OrderSelect(i,SELECT_BY_POS,MODE_TRADES))continue;
@@ -116,7 +169,7 @@ void EAGOLD_CounterfactualPathWrite(string phase)
       double ticketPL=OrderProfit()+OrderSwap()+OrderCommission();
       FileWrite(handle,
          IntegerToString((int)g_cfPathSequence),TimeToString(TimeCurrent(),TIME_DATE|TIME_SECONDS),phase,cycleId,cycleActive,
-         IntegerToString(eventSeq),IntegerToString(g_excursionSequence),
+         IntegerToString((int)eventSeq),IntegerToString((int)engineActionSeq),
          IntegerToString(OrderTicket()),EAGOLD_CounterfactualPathTypeName(type),DoubleToString(OrderLots(),DigitsLots),
          DoubleToString(OrderOpenPrice(),Digits),DoubleToString(currentPrice,Digits),
          DoubleToString(OrderStopLoss(),Digits),DoubleToString(OrderTakeProfit(),Digits),
@@ -132,19 +185,48 @@ void EAGOLD_CounterfactualPathWrite(string phase)
          r12EventChange,DoubleToString(g_r12State.eventBoundaryDurationSec,0),r12EventSequence,
          DoubleToString(Bid,Digits),DoubleToString(Ask,Digits));
       g_cfPathRowsWritten++;
+      rowsThisWrite++;
    }
 
-   FileFlush(handle);
-   if(g_cfPathRowsWritten==1 || (g_cfPathRowsWritten%1000)==0)
-      Print("EAGOLD CF PATH: rows_written=",g_cfPathRowsWritten," size_bytes=",FileSize(handle));
-   FileClose(handle);
+   if(rowsThisWrite>0)
+   {
+      g_cfPathLastWriteTime=TimeCurrent();
+      g_cfPathLastEngineActionSequence=engineActionSeq;
+      g_cfPathLastEventSequence=eventSeq;
+      g_cfPathLastBuyCount=buyCount;
+      g_cfPathLastSellCount=sellCount;
+      g_cfPathLastBuyLots=buyLots;
+      g_cfPathLastSellLots=sellLots;
+      g_cfPathLastRegime=regime;
+      g_cfPathWritesSinceFlush++;
+
+      if(g_cfPathWritesSinceFlush>=50)
+      {
+         FileFlush(handle);
+         g_cfPathWritesSinceFlush=0;
+      }
+
+      if(g_cfPathRowsWritten==rowsThisWrite || (g_cfPathRowsWritten%1000)<rowsThisWrite)
+         Print("EAGOLD CF PATH: rows_written=",g_cfPathRowsWritten," size_bytes=",FileSize(handle)," sample_seconds=",CounterfactualPathSampleSeconds);
+   }
 }
 
 void EAGOLD_CounterfactualPathReset()
 {
+   EAGOLD_CounterfactualPathCloseFile();
    g_cfPathSequence=0;
    g_cfPathRowsWritten=0;
    g_cfPathFileDiagnosticLogged=false;
+   g_cfPathFileHandle=INVALID_HANDLE;
+   g_cfPathLastWriteTime=0;
+   g_cfPathLastEngineActionSequence=-1;
+   g_cfPathLastEventSequence=-1;
+   g_cfPathLastBuyCount=-1;
+   g_cfPathLastSellCount=-1;
+   g_cfPathLastBuyLots=-1.0;
+   g_cfPathLastSellLots=-1.0;
+   g_cfPathLastRegime=-1;
+   g_cfPathWritesSinceFlush=0;
 }
 
 #endif
