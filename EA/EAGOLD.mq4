@@ -1,6 +1,6 @@
 #property strict
-#property version   "0.113"
-#property description "EAGOLD - BUY/SELL independent machines - Rules 1 to 10 + R10.2 Recovery Realization + Dynamic Recovery Step Multiplier + Persistent Operational State + Isolated R1 Admission Control + R13 Recovery Satellite + R12 M5 Observer + Excursion Telemetry + Counterfactual Path Telemetry + Adaptive Profit Guard"
+#property version   "0.115"
+#property description "EAGOLD - BUY/SELL independent machines - Rules 1 to 10 + R10.2 Recovery Realization + Dynamic Recovery Step Multiplier + Persistent Operational State + Isolated R1 Admission Control + R13 Recovery Satellite + R12 M5 Observer + Excursion Telemetry + Counterfactual Path Telemetry + Adaptive Profit Guard + Trading Window + Spread Guard"
 #include "../Core/EAGOLD_Config.mqh"
 #include "../Core/EAGOLD_ActionContract.mqh"
 #include "../Core/EAGOLD_Orders.mqh"
@@ -8,6 +8,7 @@
 #include "../Core/EAGOLD_ExcursionTracker.mqh"
 #include "../Core/EAGOLD_CounterfactualPathTelemetry.mqh"
 #include "../Core/EAGOLD_AdaptiveProfitGuard.mqh"
+#include "../Core/EAGOLD_TradingGuards.mqh"
 #include "../Core/EAGOLD_Execution.mqh"
 string EA_NAME="EAGOLD";string R10_MARKER_PREFIX="EAGOLD_R10_MARKER_";string ENGINE_MARKER_PREFIX="EAGOLD_ENGINE_";string STATE_PREFIX="EAGOLD_STATE_";bool g_r9HedgeActive=false;int g_r9ProcessedTickets[];datetime g_r10LastAction=0;string g_r1LastDecision="DISABLED";string g_r1LastReason="";datetime g_r1LastDecisionTime=0;bool g_r10RecoveryCycleActive=false;double g_r10RecoveryStartEquity=0.0;double g_r10RecoveryWorstEquity=0.0;EAGOLD_TickPolicy g_eagoldTickPolicy=EAGOLD_TICK_CONTINUE;
 #include "../Engines/EAGOLD_R10_Reconciliation.mqh"
