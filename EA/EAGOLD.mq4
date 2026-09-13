@@ -1,5 +1,5 @@
 #property strict
-#property version   "0.110"
+#property version   "0.111"
 #property description "EAGOLD - BUY/SELL independent machines - Rules 1 to 10 + R10.2 Recovery Realization + Dynamic Recovery Step Multiplier + Persistent Operational State + Isolated R1 Admission Control + R13 Recovery Satellite + R12 M5 Observer + Excursion Telemetry + Counterfactual Path Telemetry + Adaptive Profit Guard"
 #include "../Core/EAGOLD_Config.mqh"
 #include "../Core/EAGOLD_ActionContract.mqh"
