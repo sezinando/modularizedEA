@@ -3,9 +3,11 @@
 
 // Extracted from authoritative EAGOLD v0.106.
 // Stage 1: order ownership, counting and exposure measurement.
-// MagicNumber == -1 is the explicit ALL SYMBOL ORDERS ownership mode.
+// Master ownership is strictly Symbol + Magic. MagicNumber must be a dedicated
+// EAGOLD identifier; the previous MagicNumber == -1 ALL SYMBOL ORDERS mode is
+// intentionally rejected for live ownership.
 // R13 owns a reserved Magic namespace and is never part of the Master universe.
-// Ownership boundary is Symbol + Magic; comment is observational only.
+// Comment is observational only and never establishes ownership.
 
 bool IsR13Order(){
    if(OrderSymbol()!=Symbol())return(false);
@@ -13,8 +15,43 @@ bool IsR13Order(){
 }
 
 bool IsR13OwnershipConfigurationValid(){
-   if(R13MagicNumber<0)return(false);
-   if(MagicNumber!=-1 && R13MagicNumber==MagicNumber)return(false);
+   if(R13MagicNumber<=0)return(false);
+   if(MagicNumber<=0)return(false);
+   if(R13MagicNumber==MagicNumber)return(false);
+   return(true);
+}
+
+int CountLegacyMagicOrders(){
+   int count=0;
+   for(int i=OrdersTotal()-1;i>=0;i--)
+   {
+      if(!OrderSelect(i,SELECT_BY_POS,MODE_TRADES))continue;
+      if(OrderSymbol()!=Symbol())continue;
+      if(OrderMagicNumber()==-1)count++;
+   }
+   return(count);
+}
+
+bool EAGOLDValidateOwnershipConfiguration(){
+   if(MagicNumber<=0){
+      Print(EA_NAME," OWNERSHIP BLOCKED: Master MagicNumber must be > 0. Current=",MagicNumber);
+      return(false);
+   }
+   if(R13MagicNumber<=0){
+      Print(EA_NAME," OWNERSHIP BLOCKED: R13 MagicNumber must be > 0. Current=",R13MagicNumber);
+      return(false);
+   }
+   if(MagicNumber==R13MagicNumber){
+      Print(EA_NAME," OWNERSHIP BLOCKED: Master MagicNumber collides with R13 MagicNumber. Magic=",MagicNumber);
+      return(false);
+   }
+   if(RequireCleanLegacyOwnership){
+      int legacy=CountLegacyMagicOrders();
+      if(legacy>0){
+         Print(EA_NAME," OWNERSHIP BLOCKED: ",legacy," open order(s) on ",Symbol()," still use legacy MagicNumber=-1. Flatten/isolate them before enabling EAGOLD with MagicNumber=",MagicNumber,".");
+         return(false);
+      }
+   }
    return(true);
 }
 
@@ -22,7 +59,8 @@ bool IsEAGOLDOrder(){
    if(OrderSymbol()!=Symbol())return(false);
    // R13 uses a reserved Magic and is never part of the Master universe.
    if(OrderMagicNumber()==R13MagicNumber)return(false);
-   if(MagicNumber==-1)return(true);
+   // Strict ownership: EAGOLD Master manages only its dedicated Magic.
+   if(MagicNumber<=0)return(false);
    return(OrderMagicNumber()==MagicNumber);
 }
 
@@ -32,7 +70,7 @@ int CountDirectionPositions(int direction){return(CountOrdersByType(direction==O
 
 int CountDirectionPending(int direction){return(CountOrdersByType(direction==OP_BUY?OP_BUYSTOP:OP_SELLSTOP));}
 
-int CountEAGOLDOrders(){int count=0;for(int i=OrdersTotal()-1;i>=0;i--){if(!OrderSelect(i,SELECT_BY_POS,MODE_TRADES))continue;if(IsEAGOLDOrder())count++;}return(count);}
+int CountEAGOLDOrders(){int count=0;for(int i=OrdersTotal()-1;i>=0;i--){if(!IsEAGOLDOrder())continue;count++;}return(count);}
 
 double DirectionBasketProfit(int direction){int type=(direction==OP_BUY?OP_BUY:OP_SELL);double total=0.0;for(int i=OrdersTotal()-1;i>=0;i--){if(!OrderSelect(i,SELECT_BY_POS,MODE_TRADES))continue;if(!IsEAGOLDOrder()||OrderType()!=type)continue;total+=OrderProfit()+OrderSwap()+OrderCommission();}return(total);}
 
