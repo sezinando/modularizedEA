@@ -12,25 +12,31 @@
 // deleted/modified, so an active basket can finish after the entry window closes.
 //
 // Restart authority:
-//   R7 is the only restart action allowed after an economic action has consumed
-//   the current tick. Legacy lifecycle callers may still request an R7 restart,
-//   but the Action Contract prevents that second restart from being sent on the
-//   same tick. This preserves the next-tick R7 behavior while eliminating the
-//   R5/R7 duplicate authority.
+//   R7 is the ONLY authority permitted to submit an EAGOLD R7 RESTART pending.
+//   Legacy lifecycle functions may still contain compatibility code, but they
+//   cannot reach the broker because restart authorization is explicit here.
+bool g_eagoldR7RestartAuthorized=false;
+
+void EAGOLD_R7BeginRestartAuthorization(){g_eagoldR7RestartAuthorized=true;}
+void EAGOLD_R7EndRestartAuthorization(){g_eagoldR7RestartAuthorized=false;}
 
 int SendPending(int type,double price,double lots,string comment)
 {
    if(!EAGOLD_NewOrderAdmissionAllowed())return(-1);
 
-   // A completed economic action consumes the current tick. A legacy lifecycle
-   // restart request must not bypass that transaction boundary and create a
-   // second R7 order after R5/BRX has already completed.
-   if(StringFind(comment,"EAGOLD R7 RESTART",0)>=0 &&
-      !EAGOLD_EconomicExecutionAllowed())
+   bool isR7Restart=(StringFind(comment,"EAGOLD R7 RESTART",0)>=0);
+   if(isR7Restart)
    {
-      Print(EA_NAME," R7 RESTART BLOCKED: current tick already consumed by another economic action. ",
-            "The transactional R7 authority will evaluate on the next tick.");
-      return(-1);
+      if(!g_eagoldR7RestartAuthorized)
+      {
+         Print(EA_NAME," R7 RESTART BLOCKED: unauthorized restart authority. Only transactional R7 may submit restart entries.");
+         return(-1);
+      }
+      if(!EAGOLD_EconomicExecutionAllowed())
+      {
+         Print(EA_NAME," R7 RESTART BLOCKED: current tick already consumed by another economic action. The transactional R7 authority will evaluate on the next tick.");
+         return(-1);
+      }
    }
 
    RefreshRates();double stopLevel=MarketInfo(Symbol(),MODE_STOPLEVEL)*Point;price=NormalizePrice(price);lots=NormalizeLot(lots);if(type==OP_BUYSTOP&&price<=Ask+stopLevel)return(-1);if(type==OP_SELLSTOP&&price>=Bid-stopLevel)return(-1);ResetLastError();int ticket=OrderSend(Symbol(),type,lots,price,0,0,0,comment,MagicNumber,0,clrNONE);if(ticket<0)Print(EA_NAME," OrderSend failed. type=",type," error=",GetLastError()," comment=",comment);else Print(EA_NAME," pending created. ticket=",ticket," type=",type," price=",DoubleToString(price,Digits)," lot=",DoubleToString(lots,DigitsLots)," comment=",comment);return(ticket);
