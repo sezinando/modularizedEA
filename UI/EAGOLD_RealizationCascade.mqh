@@ -41,7 +41,6 @@ void EAGOLD_RealizationCascadeDelete(){ObjectsDeleteAll(0,g_realizationCascadePr
 
 void EAGOLD_RealizationCascadeUpdate()
 {
-   if(!EnableModularizationPanel){EAGOLD_RealizationCascadeDelete();return;}
    if(g_realizationCascadeCount<1&&g_actionCascadeCount<1)return;
 
    int rowHeight=16,headerHeight=20,gap=8;
