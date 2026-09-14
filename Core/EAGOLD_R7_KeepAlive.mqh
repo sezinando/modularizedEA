@@ -1,7 +1,7 @@
 #ifndef EAGOLD_R7_KEEPALIVE_MQH
 #define EAGOLD_R7_KEEPALIVE_MQH
 
-// R7 Keep-Alive Transaction v1.0
+// R7 Keep-Alive Transaction v1.1
 //
 // Purpose:
 //   Protect the economic action budget when one direction machine disappears
@@ -11,10 +11,12 @@
 //   R7 never recreates a direction while the complete EAGOLD basket is flat.
 //   Flat admission remains exclusively owned by R1 atomic admission.
 //
-// The legacy EnsureDirectionMachineAlive() remains in Lifecycle for backward
-// compatibility, but the orchestration path calls this transactional guard
-// before BuyMachine()/SellMachine(). Therefore the legacy direct SendPending
-// path is not reached when a direction is missing.
+// Restart authority:
+//   Only this transactional R7 path receives explicit broker authorization
+//   for an "EAGOLD R7 RESTART" OrderSend. Legacy lifecycle restart functions
+//   may remain for compatibility, but Core execution rejects their restart
+//   requests. This removes duplicate restart authorities without changing the
+//   proven keep-alive decision itself.
 
 EAGOLD_ActionResult EAGOLD_R7EnsureDirectionTransactional(int direction)
 {
@@ -27,15 +29,20 @@ EAGOLD_ActionResult EAGOLD_R7EnsureDirectionTransactional(int direction)
    if(CountDirectionPending(direction)>0)
       return(EAGOLD_ACTION_BLOCKED);
 
+   if(EAGOLD_EntrySuspendedThisTick())
+      return(EAGOLD_ACTION_BLOCKED);
+
    RefreshRates();
 
    int ticket=-1;
    string side=(direction==OP_BUY?"BUY":"SELL");
 
+   EAGOLD_R7BeginRestartAuthorization();
    if(direction==OP_BUY)
       ticket=SendPending(OP_BUYSTOP,Ask+PointsToPrice(BasketRestartStep),Lot,"EAGOLD R7 RESTART BUY");
    else
       ticket=SendPending(OP_SELLSTOP,Bid-PointsToPrice(BasketRestartStep),Lot,"EAGOLD R7 RESTART SELL");
+   EAGOLD_R7EndRestartAuthorization();
 
    if(ticket<=0)
    {
