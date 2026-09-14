@@ -50,7 +50,8 @@ void EAGOLD_RealizationCascadeUpdate()
    int right=68;
    int actionWidth=118,realWidth=78;
    int panelHeight=headerHeight+EAGOLD_REALIZATION_CASCADE_MAX*rowHeight+8;
-   int panelY=8;
+   // Lower the activity panel so it does not overlap the EAGOLD face/header.
+   int panelY=45;
 
    // Two independent FIFO panels, side-by-side, anchored to the upper-right.
    int realRight=right;
