@@ -10,10 +10,29 @@
 // Entry policy: all NEW broker orders pass through EAGOLD_NewOrderAdmissionAllowed().
 // Existing positions remain free to close, and pending orders remain free to be
 // deleted/modified, so an active basket can finish after the entry window closes.
+//
+// Restart authority:
+//   R7 is the only restart action allowed after an economic action has consumed
+//   the current tick. Legacy lifecycle callers may still request an R7 restart,
+//   but the Action Contract prevents that second restart from being sent on the
+//   same tick. This preserves the next-tick R7 behavior while eliminating the
+//   R5/R7 duplicate authority.
 
 int SendPending(int type,double price,double lots,string comment)
 {
    if(!EAGOLD_NewOrderAdmissionAllowed())return(-1);
+
+   // A completed economic action consumes the current tick. A legacy lifecycle
+   // restart request must not bypass that transaction boundary and create a
+   // second R7 order after R5/BRX has already completed.
+   if(StringFind(comment,"EAGOLD R7 RESTART",0)>=0 &&
+      !EAGOLD_EconomicExecutionAllowed())
+   {
+      Print(EA_NAME," R7 RESTART BLOCKED: current tick already consumed by another economic action. ",
+            "The transactional R7 authority will evaluate on the next tick.");
+      return(-1);
+   }
+
    RefreshRates();double stopLevel=MarketInfo(Symbol(),MODE_STOPLEVEL)*Point;price=NormalizePrice(price);lots=NormalizeLot(lots);if(type==OP_BUYSTOP&&price<=Ask+stopLevel)return(-1);if(type==OP_SELLSTOP&&price>=Bid-stopLevel)return(-1);ResetLastError();int ticket=OrderSend(Symbol(),type,lots,price,0,0,0,comment,MagicNumber,0,clrNONE);if(ticket<0)Print(EA_NAME," OrderSend failed. type=",type," error=",GetLastError()," comment=",comment);else Print(EA_NAME," pending created. ticket=",ticket," type=",type," price=",DoubleToString(price,Digits)," lot=",DoubleToString(lots,DigitsLots)," comment=",comment);return(ticket);
 }
 
