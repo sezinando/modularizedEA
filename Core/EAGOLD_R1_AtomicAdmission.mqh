@@ -5,9 +5,55 @@
 // A flat EAGOLD basket must end the admission attempt with either BOTH
 // directional seed pendings present or NONE. A one-sided seed is never
 // accepted as a successful first cycle.
+//
+// Cycle latch:
+//   ARMED -> R1 EXECUTED -> BASKET ACTIVE -> BASKET FLAT -> ARMED
+// A basket must first become active before a subsequent flat state can arm
+// another R1 cycle. This prevents repeated FIRST BUY/SELL seeding when a
+// pending basket is suspended/deleted before it ever becomes a live basket.
+bool g_eagoldR1CycleArmed=true;
+bool g_eagoldR1BasketWasActive=false;
+
+void EAGOLD_R1ResetCycleLatch()
+{
+   g_eagoldR1CycleArmed=true;
+   g_eagoldR1BasketWasActive=false;
+}
+
+void EAGOLD_R1ObserveCycle()
+{
+   int total=CountEAGOLDOrders();
+
+   // Any live master position/pending means the current cycle is active.
+   if(total>0)
+   {
+      g_eagoldR1BasketWasActive=true;
+      return;
+   }
+
+   // A previously active basket has now become flat. This is the only event
+   // that legitimately re-arms R1 for a new basket cycle.
+   if(g_eagoldR1BasketWasActive)
+   {
+      if(!g_eagoldR1CycleArmed)
+      {
+         g_eagoldR1CycleArmed=true;
+         Print(EA_NAME," RULE 1 CYCLE: BASKET_FLAT -> R1_REARM.");
+      }
+      g_eagoldR1BasketWasActive=false;
+   }
+}
 
 EAGOLD_ActionResult EAGOLD_CreateFirstOrdersAtomic()
 {
+   EAGOLD_R1ObserveCycle();
+
+   if(EAGOLD_EntrySuspendedThisTick())
+      return(EAGOLD_ACTION_BLOCKED);
+
+   if(!g_eagoldR1CycleArmed)
+      return(EAGOLD_ACTION_BLOCKED);
+
    if(CountEAGOLDOrders()>0)
       return(EAGOLD_ACTION_BLOCKED);
 
@@ -71,6 +117,11 @@ EAGOLD_ActionResult EAGOLD_CreateFirstOrdersAtomic()
       EAGOLD_R10RequestReconciliation();
       return(EAGOLD_ACTION_PARTIAL);
    }
+
+   // Do not re-arm from a flat state merely because the pending orders were
+   // accepted. The latch stays closed until the basket is actually observed
+   // as active, preventing repeated R1 attempts during entry suspension.
+   g_eagoldR1CycleArmed=false;
 
    Print(EA_NAME," RULE 1 ATOMIC: initial seeds created. BUY=",buyTicket," SELL=",sellTicket);
    CreateEngineActionMarker("R1","SEED",OP_BUY,Lot);
