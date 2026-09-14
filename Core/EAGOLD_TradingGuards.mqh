@@ -5,6 +5,14 @@
 // Existing market positions remain manageable. Pending orders are removed when
 // entry conditions are closed, because a pending order can otherwise be
 // activated by the broker without a new OrderSend() from the EA.
+//
+// Important lifecycle rule: once this tick suspends pending entries, economic
+// entry engines must remain blocked for the rest of the tick. This prevents
+// the sequence DELETE -> R7/R1 -> CREATE that can otherwise repeat rapidly.
+bool g_eagoldEntrySuspendedThisTick=false;
+
+void EAGOLD_ResetEntrySuspension(){g_eagoldEntrySuspendedThisTick=false;}
+bool EAGOLD_EntrySuspendedThisTick(){return(g_eagoldEntrySuspendedThisTick);}
 
 bool EAGOLD_TradingWindowOpen()
 {
@@ -42,6 +50,9 @@ bool EAGOLD_SpreadAllowed()
 
 bool EAGOLD_NewOrderAdmissionAllowed()
 {
+   if(EAGOLD_EntrySuspendedThisTick())
+      return(false);
+
    if(!EAGOLD_TradingAllowed())
       return(false);
 
@@ -63,13 +74,20 @@ bool EAGOLD_NewOrderAdmissionAllowed()
 // window becomes invalid after the pending was created, leaving it alive can
 // still create a NEW market position. Remove only EAGOLD-recognized pending
 // orders; market positions are never touched here.
+//
+// Once a pending is suspended, the current tick is entry-closed. R7, R1,
+// recovery and other NEW-order paths cannot recreate the pending until the
+// next tick, when the admission condition is evaluated again.
 int EAGOLD_SuspendInvalidPendingEntries()
 {
+   EAGOLD_ResetEntrySuspension();
+
    bool windowOpen=EAGOLD_TradingWindowOpen();
    bool spreadOpen=EAGOLD_SpreadAllowed();
    if(windowOpen && spreadOpen)
       return(0);
 
+   g_eagoldEntrySuspendedThisTick=true;
    int deleted=0;
    for(int i=OrdersTotal()-1;i>=0;i--)
    {
