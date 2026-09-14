@@ -8,9 +8,10 @@
 //
 // Cycle latch:
 //   ARMED -> R1 EXECUTED -> BASKET ACTIVE -> BASKET FLAT -> ARMED
-// A basket must first become active before a subsequent flat state can arm
-// another R1 cycle. This prevents repeated FIRST BUY/SELL seeding when a
-// pending basket is suspended/deleted before it ever becomes a live basket.
+// A cycle becomes ACTIVE only after at least one master market position has
+// actually been opened. Pending orders alone do not re-arm the cycle. This is
+// critical when a spread/time guard removes pending entries before activation:
+// the deleted pending must not cause R1 to immediately create a new cycle.
 bool g_eagoldR1CycleArmed=true;
 bool g_eagoldR1BasketWasActive=false;
 
@@ -22,10 +23,12 @@ void EAGOLD_R1ResetCycleLatch()
 
 void EAGOLD_R1ObserveCycle()
 {
-   int total=CountEAGOLDOrders();
+   int livePositions=CountDirectionPositions(OP_BUY)+CountDirectionPositions(OP_SELL);
 
-   // Any live master position/pending means the current cycle is active.
-   if(total>0)
+   // Only a real market position activates the current basket cycle. Pending
+   // seeds are deliberately excluded so guard-driven pending suspension does
+   // not manufacture a false BASKET_ACTIVE state.
+   if(livePositions>0)
    {
       g_eagoldR1BasketWasActive=true;
       return;
@@ -118,9 +121,8 @@ EAGOLD_ActionResult EAGOLD_CreateFirstOrdersAtomic()
       return(EAGOLD_ACTION_PARTIAL);
    }
 
-   // Do not re-arm from a flat state merely because the pending orders were
-   // accepted. The latch stays closed until the basket is actually observed
-   // as active, preventing repeated R1 attempts during entry suspension.
+   // Close the admission latch. It remains closed until a real market
+   // position proves that this cycle became active, then later becomes flat.
    g_eagoldR1CycleArmed=false;
 
    Print(EA_NAME," RULE 1 ATOMIC: initial seeds created. BUY=",buyTicket," SELL=",sellTicket);
